@@ -61,14 +61,6 @@ Due to the way the data is cut -- seemingly by timeline, my hunch is that a MARS
 
 We should probably discuss as a group how to deal with some of the 0 values, though, especially in Mnf.Flow, which could be a function of the the underlying patterns of the variable, or a just a null type non-data input. The Hyd.Pressures (1,2,3) also start collecting non-zero type values around the same point as Mnf.Flow. Usage.cont has a similar, but reversed pattern, but doesn't seem to be correlated, at least visually. 
 
-###Scatterplot Matrix
-```{r cache=TRUE}
-graphics.off() 
-par("mar") 
-par(mar=c(1,1,1,1))
-pairs(dfBevModH)
-```
-
 ###Density Plot
 ```{r cache=TRUE}
 par(mfrow = c(3,5), cex = .5)
