@@ -1,0 +1,245 @@
+---
+title: "Data624 - Project2"
+author: "Group 2"
+date: "November 13, 2017"
+output: html_document
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning=FALSE)
+```
+
+#Data Exploration
+We will load the data into a dataframe and get started
+
+```{r cache=TRUE}
+library(missForest)
+library(corrgram)
+library('caret')
+
+dfBevMod <- read.csv("https://github.com/ChristopheHunt/CUNY-DATA624/raw/master/data/StudentData.csv", header = TRUE)
+dfBevPred <- read.csv("https://raw.githubusercontent.com/ChristopheHunt/CUNY-DATA624/master/data/StudentEvaluation-%20TO%20PREDICT.csv", header =TRUE)
+```
+First we will examine the training dataset we want to see how many predictor variables we are dealing with and if we are missing any data 
+
+```{r cache=TRUE}
+dim(dfBevMod)
+```
+Looks like we have a total of 32 predictor variables and a target variable. Next we will check for any missing data
+
+```{r cache=TRUE}
+summary(dfBevMod)
+```
+Appears that we have one nominal variable: Brand.Code
+
+###Barchart
+```{r cache=TRUE}
+barchart(dfBevMod[,1], col="Gold")
+```
+
+###Nominal Variable Histogram
+```{r cache=TRUE}
+dfBevModH <- dfBevMod[2:ncol(dfBevMod)] #removing factor var
+par(mfrow = c(3,5), cex = .5)
+for(i in colnames(dfBevModH)){
+hist(dfBevModH[,i], xlab = names(dfBevMod[i]),
+  main = names(dfBevModH[i]), col="grey", ylab="")
+}
+```
+
+Mnf.Flow and Hyd.Pressure 1,2,3 each have many values below 0 -- possibly null-type entered values. Several variables are strongly skewed -- some of which appear to have outliers. 
+
+###Variable Scatterplots
+```{r cache=TRUE}
+par(mfrow = c(3,5), cex = .5)
+for(i in colnames(dfBevModH)){
+plot(dfBevModH[,i], xlab = names(dfBevModH[i]),
+  main = names(dfBevModH[i]), col="grey", ylab="")
+}
+```
+
+Due to the way the data is cut -- seemingly by timeline, my hunch is that a MARS algorithm could be a strong fit. A few variables have outliers. 
+
+We should probably discuss as a group how to deal with some of the 0 values, though, especially in Mnf.Flow, which could be a function of the the underlying patterns of the variable, or a just a null type non-data input. The Hyd.Pressures (1,2,3) also start collecting non-zero type values around the same point as Mnf.Flow. Usage.cont has a similar, but reversed pattern, but doesn't seem to be correlated, at least visually. 
+
+###Scatterplot Matrix
+```{r cache=TRUE}
+graphics.off() 
+par("mar") 
+par(mar=c(1,1,1,1))
+pairs(dfBevModH)
+```
+
+###Density Plot
+```{r cache=TRUE}
+par(mfrow = c(3,5), cex = .5)
+for (i in colnames(dfBevModH)) {
+ smoothScatter(dfBevModH[,i], main = names(dfBevModH[i]), ylab = "", 
+   xlab = "", colramp = colorRampPalette(c("white", "red")))
+ }
+```
+
+###BoxPlots
+```{r cache=TRUE}
+par(mfrow = c(3,5), cex = .5)
+for(i in colnames(dfBevModH)){
+boxplot(dfBevModH[,i], xlab = names(dfBevModH[i]),
+  main = names(dfBevModH[i]), col="grey", ylab="")
+}
+```
+
+Again, several variables with large skews and outliers
+
+###Principle Component Analysis
+```{r cache=TRUE, warning=F}
+PCA <- function(X) {
+  Xpca <- prcomp(na.omit(X), center = T, scale. = T) 
+  M <- as.matrix(na.omit(X)); R <- as.matrix(Xpca$rotation); score <- M %*% R
+  print(list("Importance of Components" = summary(Xpca)$importance[ ,1:5], 
+             "Rotation (Variable Loadings)" = Xpca$rotation[ ,1:5],
+             "Correlation between X and PC" = cor(na.omit(X), score)[ ,1:5]))
+  par(mfrow=c(2,3))
+  barplot(Xpca$sdev^2, ylab = "Component Variance")
+  barplot(cor(cbind(X)), ylab = "Correlations")
+  barplot(Xpca$rotation, ylab = "Loadings")  
+  biplot(Xpca); barplot(M); barplot(score)
+}
+PCA(dfBevModH)
+```
+
+First two components account for most of the variance, although Mnf.Flow is highly prioritized, so I'm concerned that it may be a function of the null-like values.  
+
+#Data Transformation
+Before we proceed we will also remove Brand.Code as it is the only categorical variable and has a lot of empty non Na values. 
+AG: I'm concerned about removing this variable altogether, going to just impute as nulls for now, but we should discuss
+```{r cache=TRUE}
+#df_imputed$Brand.Code = NULL
+dfBevMod$Brand.Code[dfBevMod$Brand.Code == ""] <- NA
+dfBevMod$Brand.Code <- droplevels(dfBevMod$Brand.Code)
+
+dfBevPred$Brand.Code[dfBevPred$Brand.Code == ""] <- NA
+dfBevPred$Brand.Code <- droplevels(dfBevPred$Brand.Code)
+
+#Recode categorical factor
+dfBevMod$A <- ifelse(dfBevMod$Brand.Code == "A", 1, 0)
+dfBevMod$B <- ifelse(dfBevMod$Brand.Code == "B", 1, 0)
+dfBevMod$C <- ifelse(dfBevMod$Brand.Code == "C", 1, 0)
+dfBevMod$D <- ifelse(dfBevMod$Brand.Code == "D", 1, 0)
+dfBevMod$Brand.Code <- NULL
+
+dfBevPred$A <- ifelse(dfBevPred$Brand.Code == "A", 1, 0)
+dfBevPred$B <- ifelse(dfBevPred$Brand.Code == "B", 1, 0)
+dfBevPred$C <- ifelse(dfBevPred$Brand.Code == "C", 1, 0)
+dfBevPred$D <- ifelse(dfBevPred$Brand.Code == "D", 1, 0)
+dfBevPred$Brand.Code <- NULL
+```
+
+It appears we have missing data for pretty much every variable. Our target variable has 4 missing values out of 2571, so we will remove the data from those instead of imputing the missing values for the target variable.
+AG: I'm a little uncomfortable here too, going to model these points for now, but we should discuss
+
+```{r cache=TRUE}
+#df = subset(df, !is.na(PH))
+#dim(df)
+```
+###Imputation
+Next we will use the missForest library to impute the missing variable of the predictor variables
+```{r cache=TRUE}
+#dfImpMod = missForest(dfBevMod)
+#dfImpMod$OOBerror #error rate looks good?
+#dfModImp <- dfImpMod$ximp
+
+#dfImpPred <- missForest(dfBevPred)
+#dfPredImp <- dfImpPred$ximp
+#dfPredImp$PH <- NA #redadding PH
+
+#write.csv(dfModImp, "TrainImputeData.csv")
+#write.csv(dfPredImp, "PredictImputeData.csv")
+
+#Stored current imputation results on github to quicken knitr iterations
+dfModImp <- read.csv("https://raw.githubusercontent.com/ChristopheHunt/CUNY-DATA624/master/data/TrainImputeData.csv")
+dfPredImp <- read.csv("https://raw.githubusercontent.com/ChristopheHunt/CUNY-DATA624/master/data/PredictImputeData.csv")
+```
+
+###Preprocessing
+Due to the different types of model imputs (some preprocess, other's dont), creating a range of preprocessed variables
+```{r cache=TRUE}
+
+dfModImpX <- dfModImp[,!(names(dfModImp) == "PH")]
+dfModImpY <- dfModImp[, names(dfModImp) == "PH"]
+
+dfPredImpX <- dfPredImp[,!(names(dfPredImp) == "PH")]
+dfPredImpY <- dfPredImp[, names(dfPredImp) == "PH"]
+
+#Spatial Sign outlier processing
+dfModImpSsX <- spatialSign(dfModImpX)
+dfPredImpSsX <- spatialSign(dfPredImpX)
+
+#BoxCox Only
+transModB <- preProcess(dfModImpSsX, method = "BoxCox") #transformed all 22 variables
+dfModBX <- predict(transModB, dfModImpSsX)
+
+transPredB <- preProcess(dfPredImpSsX, method = "BoxCox") #transformed 23 variables (should we use the Modeling model from above, instead of predicting model?)
+dfPredBX <- predict(transPredB, dfPredImpSsX)
+
+#BoxCox, Centering, and Scaling
+transModBCS <- preProcess(dfModImpSsX, method = c("BoxCox", "center", "scale")) #22 BC, 35 centered, 35 scaled
+dfModBCSX <- predict(transModBCS, dfModImpSsX)
+
+transPredBCS <- preProcess(dfPredImpSsX, method = c("BoxCox", "center", "scale")) #23 BC, 35 centered, 35 scaled
+dfPredBCSX <- predict(transPredBCS, dfPredImpSsX)
+
+#BoxCox, Centering, Scaling, and PCA
+transModBCSP <- preProcess(dfModImpSsX, method = c("BoxCox", "center", "scale", "pca")) #22 BC, 35 centered, 35 scaled
+dfModBCSPX <- predict(transModBCSP, dfModImpSsX)
+
+transPredBCSP <- preProcess(dfPredImpSsX, method = c("BoxCox", "center", "scale", "pca")) #23 BC, 35 centered, 35 scaled
+dfPredBCSPX <- predict(transPredBCSP, dfPredImpSsX)
+```
+Now we are ready to move on and review the predictor variables and attempt to reduce the number of predictor variables. We will use corrgram library to review the correlation between the variables and find the highly correlated ones that can be reduced.
+AG: I find the correlation matrix from KJ to be the easiest to read, but totally fine with either
+```{r cache=TRUE}
+#corrgram(dfModBCSX, order=TRUE,
+#         upper.panel=panel.cor, main="Correlation Matrix")
+library(corrplot)
+correlations <- cor(dfModBCSX)
+corrplot(correlations, order = "hclust", tl.cex = 0.55)
+```
+
+Several very highly correlated variables.
+
+Next we will reduce our dataset and remove pairs that have correlation above 0.60
+```{r cache=TRUE}
+hc = findCorrelation(correlations, cutoff=0.75)
+length(hc) #18 vars
+
+#Reducing
+dfModBCSRX = dfModBCSX[,-c(hc)] #Box-Cox, Center, Scale
+dfPredBCSRX = dfPredBCSX[,-c(hc)]
+
+dfModBRX = dfModBX[,-c(hc)] #Box-Cox
+dfPredBRX = dfPredBCSX[,-c(hc)]
+
+dfModSRX = dfModImpSsX[,-c(hc)] #Only Spatial Sign
+dfPredSRX = dfPredImpSsX[,-c(hc)]
+```
+Ready variables for modelling
+```{r cache=TRUE}
+set.seed(2017)
+n75 <- floor(0.75 * nrow(dfBevMod)) #75$ of sample size
+n <- sample(seq_len(nrow(dfBevMod)), size = n75)
+
+#Box-Cox, Center, Scale
+dfTrainBCSX <- dfModBCSRX[n,]
+dfTestBCSX <- dfModBCSRX[-n,]
+
+#Box-Cox
+dfTrainBX <- dfModBX[n,]
+dfTestBX <- dfModBX[-n,]
+
+#Only Spatial Sign
+dfTrainX <- dfModSRX[n,]
+dfTestX <- dfModSRX[-n,]
+
+#Response variable
+dfTrainY <- dfModImpY[n]
+dfTestY <- dfModImpY[-n]
+```
