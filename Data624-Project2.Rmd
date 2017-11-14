@@ -1,0 +1,86 @@
+---
+title: "Data624 - Project2"
+author: "Joseph Elikishvili"
+date: "November 13, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning=FALSE)
+```
+
+## Data Exploration
+
+We will load the data into a dataframe and get started
+
+```{r}
+library(missForest)
+library(corrgram)
+library('caret')
+
+df = read.csv("https://github.com/ChristopheHunt/CUNY-DATA624/raw/master/data/StudentData.csv", header = TRUE)
+```
+
+First we will examine the training dataset we want to see how many predictor variables we are dealing with and if we are missing any data 
+
+```{r}
+dim(df)
+```
+
+Looks like we have a total of 32 predictor variables and a target variable. Next we will check for any missing data
+
+```{r}
+summary(df)
+```
+
+It appears we have missing data for pretty much every variable. Our target variable has 4 missing values out of 2571, so we will remove the data from those instead of imputing the missing values for the target variable.
+
+```{r}
+df = subset(df, !is.na(PH))
+dim(df)
+```
+
+Next we will use the missForest library to impute the missing variable of the predictor variables
+
+```{r}
+df_imp = missForest(df)
+df_imputed = df_imp$ximp
+```
+
+Now we are ready to move on and review the predictor variables and attempt to reduce the number of predictor variables. We will use corrgram library to review the correlation between the variables and find the highly correlated ones that can be reduced.
+
+```{r}
+corrgram(df_imputed, order=TRUE,
+         upper.panel=panel.cor, main="Correlation Matrix")
+```
+
+Before we proceed we will also remove Brand.Code as it is the only categorical variable and has a lot of empty non Na values. 
+
+```{r}
+df_imputed$Brand.Code = NULL
+```
+
+
+Next we will reduce our dataset and remove pairs that have correlation above 0.60
+
+```{r}
+#https://stackoverflow.com/questions/18275639/remove-highly-correlated-variables
+
+df2 = cor(df_imputed)
+hc = findCorrelation(df2, cutoff=0.6)
+hc = sort(hc)
+reduced_Data = df_imputed[,-c(hc)]
+```
+
+Lets review the dimension of the dataset and recreate correlation matrix
+
+```{r}
+dim(reduced_Data)
+```
+
+```{r}
+corrgram(reduced_Data, order=TRUE,
+         upper.panel=panel.cor, main="Correlation Matrix")
+```
+
+At this point we have 19 predictor variables with imputed data and with correlation below 0.6. 
