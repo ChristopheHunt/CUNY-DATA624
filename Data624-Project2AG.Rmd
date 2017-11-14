@@ -198,7 +198,7 @@ corrplot(correlations, order = "hclust", tl.cex = 0.55)
 
 Several very highly correlated variables.
 
-Next we will reduce our dataset and remove pairs that have correlation above 0.60
+Next we will reduce our dataset and remove pairs that have correlation above 0.75
 ```{r cache=TRUE}
 hc = findCorrelation(correlations, cutoff=0.75)
 length(hc) #18 vars
