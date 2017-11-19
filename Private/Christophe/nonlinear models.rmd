@@ -1,0 +1,104 @@
+---
+title: "Nonlinear Models - Project 2"
+output: html_notebook
+---
+
+```{r, include=FALSE}
+library(caret)
+library(stargazer)
+library(tidyverse)
+library(Metrics)
+```
+
+# MARS Model
+
+```{r, cache=TRUE}
+library(caret)
+
+set.seed(1234)
+
+mars <- function(df, y){
+           
+          fitControl <- trainControl(method = "cv", 
+                                     number = 3, 
+                                     returnResamp = "all")
+
+          marsGrid <- expand.grid(.degree = 1:2, 
+                                  .nprune = 2:38)
+
+          return(train(df, y, 
+                 method = "earth", 
+                 tuneGrid = marsGrid, 
+                 trControl = fitControl))
+         }
+
+mars.fit.bcsx <- mars(dfTrainBCSX, dfTrainY)
+mars.fit.bx   <- mars(dfTrainBX,   dfTrainY)
+mars.fit.x    <- mars(dfTrainX,    dfTrainY)
+```
+
+```{r, cache=TRUE}
+list(RMSE_MARS.BCSX = RMSE(predict(mars.fit.bcsx, dfTrainBCSX), dfTrainY),
+     RMSE_MARS.BCS  = RMSE(predict(mars.fit.bx,   dfTrainBX), dfTrainY),
+     RMSE_MARS.X    = RMSE(predict(mars.fit.x,    dfTrainX), dfTrainY))
+```
+
+```{r, cache=TRUE}
+summary(mars.fit.bx, digit=3)
+```
+
+```{r}
+varImp(mars.fit.bx)
+```
+
+```{r}
+plot(mars.fit.bx)
+```
+
+# Neural Network
+
+```{r, cache=TRUE}
+nnet <- function(df, y){
+  
+              nnetGrid <- expand.grid(.decay = c(0, 0.01, .1),
+                                      .size = c(1:10),
+                                      .bag = FALSE)
+              
+              fitControl <- trainControl(method = "cv", 
+                                         number = 3, 
+                                         returnResamp = "all")
+    
+                 return(train(df, y, 
+                              method = "avNNet", 
+                              tuneGrid = nnetGrid,
+                              trControl = fitControl,
+                              preProc = c("center", "scale"),
+                              trace = FALSE,
+                              repeats = 2))
+}
+
+nnet.fit.bcsx <- nnet(dfTrainBCSX, dfTrainY)
+nnet.fit.bx   <- nnet(dfTrainBX,   dfTrainY)
+nnet.fit.x    <- nnet(dfTrainX,    dfTrainY)
+```
+
+```{r}
+list(RMSE_NNET.BCSX = RMSE(predict(nnet.fit.bcsx, dfTrainBCSX), dfTrainY),
+     RMSE_NNET.BCS  = RMSE(predict(nnet.fit.bx,   dfTrainBX), dfTrainY),
+     RMSE_NNET.X    = RMSE(predict(nnet.fit.x,    dfTrainX), dfTrainY))
+```
+
+```{r, cache=TRUE}
+varImp(nnet.fit.x)
+```
+
+
+```{r, cache=TRUE}
+plot(nnet.fit.x)
+```
+
+```{r, cache=TRUE}
+list(RMSE_MARS = RMSE(predict(mars.fit.bx, dfTrainBX), dfTrainY),
+     RMSE_NNET = RMSE(predict(nnet.fit.bx, dfTrainBX), dfTrainY))
+```
+
