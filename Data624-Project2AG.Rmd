@@ -36,6 +36,18 @@ Appears that we have one nominal variable: Brand.Code
 barchart(dfBevMod[,1], col="Gold")
 ```
 
+### Continuous and Discrete variables
+
+```{r}
+library(psych)
+library("knitr")
+table.desc <- describe(dfBevMod[,-1])
+table.prep <- as.matrix(table.desc)
+table.round <- round((table.prep), 2)
+kable(table.round)
+```
+
+
 ###Nominal Variable Histogram
 ```{r cache=TRUE}
 dfBevModH <- dfBevMod[2:ncol(dfBevMod)] #removing factor var
