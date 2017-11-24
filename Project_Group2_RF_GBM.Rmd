@@ -1,0 +1,98 @@
+---
+title: "Random Forest and GBM"
+author: "Daniel Hong"
+date: "November 24, 2017"
+output: html_document
+---
+
+#Random Forest
+```{r, cache=TRUE}
+
+library(randomForest)
+
+set.seed(1234)
+
+rf <- function(df,y){
+       fitControl <- trainControl(method = "cv",
+       number = 10, #5folds)
+                           
+rfgrid <- expand.grid(interaction.depth = 2,
+            n.trees = 500,
+            shrinkage = 0.1,
+            n.minobsinnode = 10))
+  
+return(train(df, y, 
+             method = "randomForest", 
+             tuneGrid = rfgrid, 
+             trControl = fitControl))
+}
+
+rf.fit.bcsx <- randomForest(dfTrainBCSX, dfTrainY)
+rf.fit.bx   <- randomForest(dfTrainBX, dfTrainY)
+rf.fit.x    <- randomForest(dfTrainX,    dfTrainY)
+```
+
+```{r, cache=TRUE}
+list(RMSE_RF.BCSX = RMSE(predict(rf.fit.bcsx, dfTrainBCSX), dfTrainY),
+     RMSE_RF.BCS  = RMSE(predict(rf.fit.bx, dfTrainBX), dfTrainY),
+     RMSE_RF.X    = RMSE(predict(rf.fit.x, dfTrainX), dfTrainY))
+```
+
+```{r, cache=TRUE}
+summary(rf.fit.bx, digit=3)
+```
+
+```{r, cache=TRUE}
+#varImp(rf.fit.bx)
+#Error in varImp[, "%IncMSE"] : subscript out of bounds
+```
+
+```{r, cache=TRUE}
+plot(rf.fit.bx)
+```
+
+#GBM
+```{r, cache=TRUE}
+
+library(caret)
+
+set.seed(1234)
+
+gbm <- function(df,y){
+       fitControl <- trainControl(method = "cv",
+       number = 10, #5folds)
+                           
+gbmgrid <- expand.grid(interaction.depth = 2,
+            n.trees = 500,
+            shrinkage = 0.1,
+            n.minobsinnode = 10))
+  
+return(train(df, y, 
+             method = "gbm", 
+             tuneGrid = gbmgrid, 
+             trControl = fitControl))
+}
+
+gbm.fit.bcsx <- gbm(dfTrainBCSX, dfTrainY)
+gbm.fit.bx   <- gbm(dfTrainBX, dfTrainY)
+gbm.fit.x    <- gbm(dfTrainX,    dfTrainY)
+```
+
+```{r, cache=TRUE}
+list(RMSE_GBM.BCSX = RMSE(predict(gbm.fit.bcsx, dfTrainBCSX), dfTrainY),
+     RMSE_GBM.BCS  = RMSE(predict(gbm.fit.bx, dfTrainBX), dfTrainY),
+     RMSE_GBM.X    = RMSE(predict(gbm.fit.x, dfTrainX), dfTrainY))
+```
+
+```{r, cache=TRUE}
+summary(gbm.fit.bx, digit=3)
+```
+
+```{r, cache=TRUE}
+varImp(gbm.fit.bx)
+```
+
+```{r, cache=TRUE}
+#plot(gbm.fit.bx)
+#getting error in plot.train(gbm.fit.bx) : There are no tuning parameters with more than 1 value.
+```
