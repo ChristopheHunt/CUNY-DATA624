@@ -62,14 +62,23 @@ hist(dfBevModH[,i], xlab = names(dfBevMod[i]),
 ```
 Mnf.Flow and Hyd.Pressure 1,2,3 each have many values below 0 -- possibly null-type entered values. Several variables are strongly skewed -- some of which appear to have outliers. 
 
-Exploring other variables, we see 
+Exploring differences by Brand
 ```{r cache=TRUE}
 BrandA <- dfBevMod[dfBevMod$Brand.Code == "A",]
-summary(dfBevMod[dfBevMod$Mnf.Flow == -100,])
-plot(dfBevMod$Brand.Code, dfBevMod$Mnf.Flow)
-table(dfBevMod$Brand.Code, dfBevMod$Mnf.Flow)
-nrow(dfBevMod[dfBevMod$Mnf.Flow < 1,])
+BAM <- colMeans(BrandA[,2:ncol(BrandA)], na.rm = TRUE)
+BrandB <- dfBevMod[dfBevMod$Brand.Code == "B",]
+BBM <- colMeans(BrandB[,2:ncol(BrandB)], na.rm = TRUE)
+BrandC <- dfBevMod[dfBevMod$Brand.Code == "C",]
+BCM <- colMeans(BrandC[,2:ncol(BrandC)], na.rm = TRUE)
+BrandD <- dfBevMod[dfBevMod$Brand.Code == "D",]
+BDM <- colMeans(BrandD[,2:ncol(BrandD)], na.rm = TRUE)
+BrandE <- dfBevMod[dfBevMod$Brand.Code == "",]
+BEM <- colMeans(BrandE[,2:ncol(BrandE)], na.rm = TRUE)
+
+combBrand <- cbind(BAM, BBM, BCM, BDM, BEM)
+combBrand
 ```
+Notable differences among brands by Hyd.Pressure4, Density, Balling, and Balling.Lvl 
 
 ###Density Plot
 ```{r cache=TRUE}
