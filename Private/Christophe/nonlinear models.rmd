@@ -5,12 +5,93 @@ output: html_notebook
 
 ```{r, include=FALSE}
 library(caret)
-library(stargazer)
 library(tidyverse)
 library(Metrics)
 ```
 
-# MARS Model
+# Nonlinear Models
+
+Using the several data sets created from our previous transformations we attempted to fit several non-linear models. Specifically, a Neural Network and MARS model. While data transformations are not always necessary for the MARS method, we will nonetheless benefit from removing data features that would be adding unncessary noise to our final models. The Neural Network can be greatly impacted by highly correlated variables. 
+
+## Neural Network
+
+Neural Networks can be thought of as models that work in similar ways to our brain. Inputs are provided and transformed at nodes by assigned weights that then feed-forward to any additional layers containing additional nodes [^1]. A drawback to this method is that without limitations on our linear combinations from one layer to another, the coefficients will have little context [^3]. 
+
+In the below code snippet, we set our seed for reproducibility, then we set `trainControl` for 3 repeats of the cross validated method and keep our resamples by setting `returnResamp = "all"`. We then manually tune our grid with the `expand.grid` function and set the Weight Decay via `.decay`, the Hidden Units via `.size`, and then prevent Bagging since we have sufficiently preprocessed our data `.bag = FALSE`. Also, since we are preforming a regression and not a classfication we set `linout` to `TRUE`. 
+
+[1] Bishop, Christopher M. Neural Networks for Pattern Recognition. Oxford???: New York: Clarendon Press???; Oxford University Press, 1995.
+
+[3] Kuhn, Max, and Kjell Johnson. Applied Predictive Modeling. New York: Springer, 2013.
+
+```{r}
+library(doParallel)
+cl <- makeCluster(4)
+registerDoParallel(cl)
+```
+
+
+```{r, cache=TRUE}
+set.seed(1234)
+
+nnet <- function(df, y){
+  
+              fitControl <- trainControl(method = "cv", 
+                                         number = 3, 
+                                         returnResamp = "all")
+              
+              nnetGrid <- expand.grid(.decay = c(0, 0.01, .1, .5),
+                                      .size = c(5:15),
+                                      .bag = FALSE)
+    
+                 return(train(df, y, 
+                              method = "avNNet", 
+                              tuneGrid = nnetGrid,
+                              trControl = fitControl,
+                              trace = FALSE,
+                              linout = TRUE))
+}
+
+nnet.fit.bcsx <- nnet(dfTrainBCSX, dfTrainY)
+nnet.fit.bx   <- nnet(dfTrainBX,   dfTrainY)
+nnet.fit.x    <- nnet(dfTrainX,    dfTrainY)
+```
+
+Now that we have trained our models on the available data sets, we will measure the root mean squared error of all three and select the lowest. 
+
+```{r}
+list(RMSE_NNET.BCSX = RMSE(predict(nnet.fit.bcsx, dfTrainBCSX), dfTrainY),
+     RMSE_NNET.BCS  = RMSE(predict(nnet.fit.bx,   dfTrainBX), dfTrainY),
+     RMSE_NNET.X    = RMSE(predict(nnet.fit.x,    dfTrainX), dfTrainY))
+```
+
+Based on our RMSE results the final model chosen for the neural network is `nnet.fit.bcsx`
+
+```{r}
+nnet.fit.bcsx$finalModel
+```
+
+Further, we see that `X` and `Mnf.Flow` are the variables with the greatest importance in the model.
+
+```{r, cache=TRUE}
+varImp(nnet.fit.bcsx)
+```
+
+The grid parameters we set earlier are plotted below to visualize how tuning impacts the model performance.
+
+```{r, cache=TRUE}
+plot(nnet.fit.bcsx)
+```
+
+
+## MARS Model
+
+The Multivariate Adaptive Regression Splines or "MARS" model is a nonparametric method, i.e. we are not required to make any assumptions about any underlying distributions such as the neural network. It can achieve this by pivoting on naturally occuring breaks in the data set and essentially building a model out of many linear models developed for specific segemets of the data set [^2] [^3]. 
+
+[2] J.H. Friedman, "Multivariate adaptive regression splines", The Annals of Statistics, 19 (1991), pp. 1-141
+
+[3] Kuhn, Max, and Kjell Johnson. Applied Predictive Modeling. New York: Springer, 2013.
+
+In the below code snippet, we set our seed for reproducibility, then we set `trainControl` for 3 repeats of the cross validated method and keep our resamples by setting `returnResamp = "all"`. We then set our tune grid for 2,3, and 4 product degrees `degree= 2:4` and the number of terms possible from 20 to 60 `nprune = seq(20,60,20)`. We would not need to set these values if we intended to use the training set without any resampling or parameter tuning.
 
 ```{r, cache=TRUE}
 library(caret)
@@ -23,12 +104,12 @@ mars <- function(df, y){
                                      number = 3, 
                                      returnResamp = "all")
 
-          marsGrid <- expand.grid(.degree = 1:2, 
-                                  .nprune = 2:38)
-
+          MARSGrid <- expand.grid(degree= 3:5, 
+                                  nprune = seq(20,60,20))
+          
           return(train(df, y, 
                  method = "earth", 
-                 tuneGrid = marsGrid, 
+                 tuneGrid = MARSGrid,
                  trControl = fitControl))
          }
 
@@ -37,68 +118,39 @@ mars.fit.bx   <- mars(dfTrainBX,   dfTrainY)
 mars.fit.x    <- mars(dfTrainX,    dfTrainY)
 ```
 
+Now that we have trained our models on the available data sets, we will measure the root mean squared error of all three and select the lowest. 
+
 ```{r, cache=TRUE}
 list(RMSE_MARS.BCSX = RMSE(predict(mars.fit.bcsx, dfTrainBCSX), dfTrainY),
      RMSE_MARS.BCS  = RMSE(predict(mars.fit.bx,   dfTrainBX), dfTrainY),
      RMSE_MARS.X    = RMSE(predict(mars.fit.x,    dfTrainX), dfTrainY))
 ```
 
-```{r, cache=TRUE}
-summary(mars.fit.bx, digit=3)
-```
+The model fitted to the mars.fit.bx preformed the best and is further selected to be evaluated. The model results are provided below.
 
 ```{r}
-varImp(mars.fit.bx)
+mars.fit.bx$finalModel
 ```
+
+The below figure provides insight into the tuning parameters. We can see that our 5 degree model begins to outperform our 4 degree model at the max of 40 terms but the 4 degree model outperforms the 5 degree model at the 60 maximum terms. 
 
 ```{r}
 plot(mars.fit.bx)
 ```
 
-# Neural Network
-
-```{r, cache=TRUE}
-nnet <- function(df, y){
-  
-              nnetGrid <- expand.grid(.decay = c(0, 0.01, .1),
-                                      .size = c(1:10),
-                                      .bag = FALSE)
-              
-              fitControl <- trainControl(method = "cv", 
-                                         number = 3, 
-                                         returnResamp = "all")
-    
-                 return(train(df, y, 
-                              method = "avNNet", 
-                              tuneGrid = nnetGrid,
-                              trControl = fitControl,
-                              preProc = c("center", "scale"),
-                              trace = FALSE,
-                              repeats = 2))
-}
-
-nnet.fit.bcsx <- nnet(dfTrainBCSX, dfTrainY)
-nnet.fit.bx   <- nnet(dfTrainBX,   dfTrainY)
-nnet.fit.x    <- nnet(dfTrainX,    dfTrainY)
-```
+In our final MARS model, the variable of greatest importance is `Mnf.Flow`.
 
 ```{r}
-list(RMSE_NNET.BCSX = RMSE(predict(nnet.fit.bcsx, dfTrainBCSX), dfTrainY),
-     RMSE_NNET.BCS  = RMSE(predict(nnet.fit.bx,   dfTrainBX), dfTrainY),
-     RMSE_NNET.X    = RMSE(predict(nnet.fit.x,    dfTrainX), dfTrainY))
+varImp(mars.fit.bx)
 ```
+
+# Model Choice
+
+Between the two non linear models the lowest RMSE measure is MARS, so we will move forward with that model. It appears that our Neural Net model may suffer from overfitting since the Neural Net has a much better RMSE on the training data set than the MARS model.
 
 ```{r, cache=TRUE}
-varImp(nnet.fit.x)
+list(RMSE_MARS = RMSE(predict(mars.fit.bx, dfTestBX), dfTestY),
+     RMSE_NNET = RMSE(predict(nnet.fit.bcsx, dfTestBCSX), dfTestY))
 ```
 
-
-```{r, cache=TRUE}
-plot(nnet.fit.x)
-```
-
-```{r, cache=TRUE}
-list(RMSE_MARS = RMSE(predict(mars.fit.bx, dfTrainBX), dfTrainY),
-     RMSE_NNET = RMSE(predict(nnet.fit.bx, dfTrainBX), dfTrainY))
-```
 
