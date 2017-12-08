@@ -23,13 +23,6 @@ In the below code snippet, we set our seed for reproducibility, then we set `tra
 
 [3] Kuhn, Max, and Kjell Johnson. Applied Predictive Modeling. New York: Springer, 2013.
 
-```{r}
-library(doParallel)
-cl <- makeCluster(4)
-registerDoParallel(cl)
-```
-
-
 ```{r, cache=TRUE}
 set.seed(1234)
 
@@ -59,9 +52,9 @@ nnet.fit.x    <- nnet(dfTrainX,    dfTrainY)
 Now that we have trained our models on the available data sets, we will measure the root mean squared error of all three and select the lowest. 
 
 ```{r}
-list(RMSE_NNET.BCSX = RMSE(predict(nnet.fit.bcsx, dfTrainBCSX), dfTrainY),
-     RMSE_NNET.BCS  = RMSE(predict(nnet.fit.bx,   dfTrainBX), dfTrainY),
-     RMSE_NNET.X    = RMSE(predict(nnet.fit.x,    dfTrainX), dfTrainY))
+list(RMSE_NNET.BCSX = RMSE(predict(nnet.fit.bcsx, dfTestBCSX), dfTestY),
+     RMSE_NNET.BCS  = RMSE(predict(nnet.fit.bx,   dfTestBX), dfTestY),
+     RMSE_NNET.X    = RMSE(predict(nnet.fit.x,    dfTestX), dfTestY))
 ```
 
 Based on our RMSE results the final model chosen for the neural network is `nnet.fit.bcsx`
@@ -121,9 +114,9 @@ mars.fit.x    <- mars(dfTrainX,    dfTrainY)
 Now that we have trained our models on the available data sets, we will measure the root mean squared error of all three and select the lowest. 
 
 ```{r, cache=TRUE}
-list(RMSE_MARS.BCSX = RMSE(predict(mars.fit.bcsx, dfTrainBCSX), dfTrainY),
-     RMSE_MARS.BCS  = RMSE(predict(mars.fit.bx,   dfTrainBX), dfTrainY),
-     RMSE_MARS.X    = RMSE(predict(mars.fit.x,    dfTrainX), dfTrainY))
+list(RMSE_MARS.BCSX = RMSE(predict(mars.fit.bcsx, dfTestBCSX), dfTestY),
+     RMSE_MARS.BCS  = RMSE(predict(mars.fit.bx,   dfTestBX), dfTestY),
+     RMSE_MARS.X    = RMSE(predict(mars.fit.x,    dfTestX), dfTestY))
 ```
 
 The model fitted to the mars.fit.bx preformed the best and is further selected to be evaluated. The model results are provided below.
