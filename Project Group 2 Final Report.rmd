@@ -1,0 +1,453 @@
+---
+title: "Final Draft"
+output:
+  word_document: default
+  html_notebook: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning=FALSE, cache=TRUE)
+```
+
+# Overview
+
+### Abstract
+
+The purpose of this report is to address the new regulations and to better understand the manufacturing process within ABC Beverage.  We will examine all factors involved in the production process and will attempt to identify the factors that will help us properly predict the PH levels as well us understand the influence of the various factors on the overall process.
+
+### Data used
+
+This report is using the historical data collected from approximately 2572 samples which should be sufficient for the analysis. 
+
+### Brief overview of the process
+
+We will first cleanup the data, by filling in or imputing the missing data, use various transformation methods in order to normalize the data to address issues such as outlier data points and other normalization related issues.
+
+Next we will run various models in order to identify the factors that are important to reaching out goal and once we have those we will use various models in order to estimate the PH levels and come up with a best suiting method that we feel will be best to predict the data we are looking for.
+
+We will include documented R code within the report so that it is easy to follow our research. Should you have any questions regarding the process or the code, feel free to reach out to our department.
+
+# Data Exploration
+
+We will get started by loading our historical data into a data frame and loading the necessary libraries.
+
+```{r cache=TRUE}
+library(missForest)
+library(corrgram)
+library(caret)
+library(psych)
+library(knitr)
+
+dfBevMod <- read.csv("https://github.com/ChristopheHunt/CUNY-DATA624/raw/master/data/StudentData.csv", header = TRUE)
+dfBevPred <- read.csv("https://raw.githubusercontent.com/ChristopheHunt/CUNY-DATA624/master/data/StudentEvaluation-%20TO%20PREDICT.csv", header =TRUE)
+```
+
+We will examine the training dataset we want to see how many predictor variables we are dealing with and if we are missing any data. We see several variables with missing data, 
+
+```{r cache=TRUE}
+dim(dfBevMod)
+```
+
+It appears we have a total of 32 predictor variables and a target variable. Next we will check for any missing data.
+
+```{r cache=TRUE}
+colSums(is.na(dfBevMod))
+```
+
+We see many variables with NA's -- notably "MFR" has 212. Still, roughly 8% NA is workable, so we'll choose to use imputation process to fill in the missing data. 
+
+Also, it appears that we have one categorical variable: Brand.Code
+
+### Barchart
+
+```{r cache=TRUE}
+#Visualizing the single categorical variable
+barchart(dfBevMod[,1], col="Gold")
+```
+
+It appears that brand "B" occurs most frequently, followed by "D"
+
+### Continuous and Discrete variables
+
+Next we will review all the variables we are working with in order to better understand the data they are presenting us. We can see the mean, variation and other metrics within the following table for a quick detailed reference. 
+
+```{r}
+library(psych)
+library(knitr)
+table.desc <- describe(dfBevMod[,-1])
+table.prep <- as.matrix(table.desc)
+table.round <- round((table.prep), 2)
+kable(table.round)
+```
+
+### Nominal Variable Histogram
+
+Next we will visually view each one of the factors, its easier to visually navigate through a large number of variables. We are interested to see how data is distributed for each one of the variables. Please refer to above table for more specific information. 
+
+```{r cache=TRUE}
+dfBevModH <- dfBevMod[2:ncol(dfBevMod)] #removing factor var
+par(mfrow = c(3,5), cex = .5)
+for(i in colnames(dfBevModH)){
+hist(dfBevModH[,i], xlab = names(dfBevMod[i]),
+  main = names(dfBevModH[i]), col="grey", ylab="")
+}
+```
+
+We can see that Mnf.Flow and Hyd.Pressure 1,2,3 each have many values below 0 -- possibly null-type entered values. Several variables are strongly skewed -- some of which appear to have outliers. 
+
+Next we want to explore differences by Brand
+
+```{r cache=TRUE}
+BrandA <- dfBevMod[dfBevMod$Brand.Code == "A",]
+BAM <- colMeans(BrandA[,2:ncol(BrandA)], na.rm = TRUE)
+BrandB <- dfBevMod[dfBevMod$Brand.Code == "B",]
+BBM <- colMeans(BrandB[,2:ncol(BrandB)], na.rm = TRUE)
+BrandC <- dfBevMod[dfBevMod$Brand.Code == "C",]
+BCM <- colMeans(BrandC[,2:ncol(BrandC)], na.rm = TRUE)
+BrandD <- dfBevMod[dfBevMod$Brand.Code == "D",]
+BDM <- colMeans(BrandD[,2:ncol(BrandD)], na.rm = TRUE)
+BrandE <- dfBevMod[dfBevMod$Brand.Code == "",]
+BEM <- colMeans(BrandE[,2:ncol(BrandE)], na.rm = TRUE)
+
+combBrand <- cbind(BAM, BBM, BCM, BDM, BEM)
+combBrand
+```
+
+Notable differences exist among brands by Hyd.Pressure4, Density, Balling, and Balling.Lvl 
+
+###Density Plot
+
+Next we will use density plots to better understand the data and look for any abnormalities.
+
+```{r cache=TRUE}
+par(mfrow = c(3,5), cex = .5)
+for (i in colnames(dfBevModH)) {
+ smoothScatter(dfBevModH[,i], main = names(dfBevModH[i]), ylab = "", 
+   xlab = "", colramp = colorRampPalette(c("white", "red")))
+ }
+```
+
+The odd data in Mnf.Flow appears to be related to similarly zero-out data in Hyd.Pressure1, Hyd.Press2, and Hyd.Pressure3. Several other variables have dichotomous patterns in data behavior, including "Carb.Pressure1", "Filler.Level", "Usage.cont", "Carb.Flow", and "Oxygen.Filler". This leaves two options; we can alter these gaps by possibly inputing new values in, or we can use algorithms that can easily handle quick pattern shifts, such as forests and MARS.  
+
+###BoxPlots
+
+Next we want to take a look at any outliers within our variables.  Boxplots provide a quick and effective way of view the data and look for any skew or outliers
+
+```{r cache=TRUE}
+par(mfrow = c(3,5), cex = .5)
+for(i in colnames(dfBevModH)){
+boxplot(dfBevModH[,i], xlab = names(dfBevModH[i]),
+  main = names(dfBevModH[i]), col="grey", ylab="")
+}
+```
+
+Again, several variables with large skews and outliers are present we will need to use transformation techniques later on to handle this issue.
+
+###Principle Component Analysis
+
+Since we are dealing with 32 predictor variables and not all of them can be relevant to our study, we will need a way to filter through the variables to reduce the number of variables we are working with. This can be done with PCA
+
+```{r cache=TRUE, warning=F}
+PCA <- function(X) {
+  Xpca <- prcomp(na.omit(X), center = T, scale. = T) 
+  M <- as.matrix(na.omit(X)); R <- as.matrix(Xpca$rotation); score <- M %*% R
+  print(list("Importance of Components" = summary(Xpca)$importance[ ,1:5], 
+             "Rotation (Variable Loadings)" = Xpca$rotation[ ,1:5],
+             "Correlation between X and PC" = cor(na.omit(X), score)[ ,1:5]))
+  par(mfrow=c(2,3))
+  barplot(Xpca$sdev^2, ylab = "Component Variance")
+  barplot(cor(cbind(X)), ylab = "Correlations")
+  barplot(Xpca$rotation, ylab = "Loadings")  
+  biplot(Xpca); barplot(M); barplot(score)
+}
+PCA(dfBevModH)
+```
+First two components account for most of the variance, although Mnf.Flow is highly prioritized, so I'm concerned that it may be a function of the null-like values.  
+
+#Data Transformation
+
+Since Brand Code is a categorical variable, we will have to transform it to a binary so that models can use the data.
+
+```{r cache=TRUE}
+#df_imputed$Brand.Code = NULL
+dfBevMod$Brand.Code[dfBevMod$Brand.Code == ""] <- NA
+dfBevMod$Brand.Code <- droplevels(dfBevMod$Brand.Code)
+
+dfBevPred$Brand.Code[dfBevPred$Brand.Code == ""] <- NA
+dfBevPred$Brand.Code <- droplevels(dfBevPred$Brand.Code)
+
+#Recode categorical factor
+dfBevMod$A <- ifelse(dfBevMod$Brand.Code == "A", 1, 0)
+dfBevMod$B <- ifelse(dfBevMod$Brand.Code == "B", 1, 0)
+dfBevMod$C <- ifelse(dfBevMod$Brand.Code == "C", 1, 0)
+dfBevMod$D <- ifelse(dfBevMod$Brand.Code == "D", 1, 0)
+dfBevMod$Brand.Code <- NULL
+
+dfBevPred$A <- ifelse(dfBevPred$Brand.Code == "A", 1, 0)
+dfBevPred$B <- ifelse(dfBevPred$Brand.Code == "B", 1, 0)
+dfBevPred$C <- ifelse(dfBevPred$Brand.Code == "C", 1, 0)
+dfBevPred$D <- ifelse(dfBevPred$Brand.Code == "D", 1, 0)
+dfBevPred$Brand.Code <- NULL
+```
+
+###Imputation
+Next we will use the missForest library to impute the missing variable of the predictor variables. The library will use the best method in filling in the missing data.
+
+Please note: We need to perform this step in order to have a complete dataset. Most models will not run on a data set with missing data. This is a common step in data science and filling in the data does not compromise the final results
+
+```{r cache=TRUE}
+#dfImpMod = missForest(dfBevMod)
+#dfImpMod$OOBerror #error rate looks good?
+#dfModImp <- dfImpMod$ximp
+
+#dfImpPred <- missForest(dfBevPred)
+#dfPredImp <- dfImpPred$ximp
+#dfPredImp$PH <- NA #redadding PH
+
+#write.csv(dfModImp, "TrainImputeData.csv")
+#write.csv(dfPredImp, "PredictImputeData.csv")
+
+#Stored current imputation results on github to quicken knitr iterations
+dfModImp <- read.csv("https://raw.githubusercontent.com/ChristopheHunt/CUNY-DATA624/master/data/TrainImputeData.csv")
+dfPredImp <- read.csv("https://raw.githubusercontent.com/ChristopheHunt/CUNY-DATA624/master/data/PredictImputeData.csv")
+```
+
+###Preprocessing
+
+Next we will preprocess the data using various methods, this step will handle the issues of outliers and will get the data in the final stage where it can be used with the predictive models.  Due to the different types of model inputs (some preprocess, other's dont), we will be creating a range of preprocessed variables
+
+```{r cache=TRUE}
+
+dfModImpX <- dfModImp[,!(names(dfModImp) == "PH")]
+dfModImpY <- dfModImp[, names(dfModImp) == "PH"]
+
+dfPredImpX <- dfPredImp[,!(names(dfPredImp) == "PH")]
+dfPredImpY <- dfPredImp[, names(dfPredImp) == "PH"]
+
+#Spatial Sign outlier processing
+dfModImpSsX <- spatialSign(dfModImpX)
+dfPredImpSsX <- spatialSign(dfPredImpX)
+
+#BoxCox Only
+transModB <- preProcess(dfModImpSsX, method = "BoxCox") #transformed all 22 variables
+dfModBX <- predict(transModB, dfModImpSsX)
+
+transPredB <- preProcess(dfPredImpSsX, method = "BoxCox") #transformed 23 variables (should we use the Modeling model from above, instead of predicting model?)
+dfPredBX <- predict(transPredB, dfPredImpSsX)
+
+#BoxCox, Centering, and Scaling
+transModBCS <- preProcess(dfModImpSsX, method = c("BoxCox", "center", "scale")) #22 BC, 35 centered, 35 scaled
+dfModBCSX <- predict(transModBCS, dfModImpSsX)
+
+transPredBCS <- preProcess(dfPredImpSsX, method = c("BoxCox", "center", "scale")) #23 BC, 35 centered, 35 scaled
+dfPredBCSX <- predict(transPredBCS, dfPredImpSsX)
+
+#BoxCox, Centering, Scaling, and PCA
+transModBCSP <- preProcess(dfModImpSsX, method = c("BoxCox", "center", "scale", "pca")) #22 BC, 35 centered, 35 scaled
+dfModBCSPX <- predict(transModBCSP, dfModImpSsX)
+
+transPredBCSP <- preProcess(dfPredImpSsX, method = c("BoxCox", "center", "scale", "pca")) #23 BC, 35 centered, 35 scaled
+dfPredBCSPX <- predict(transPredBCSP, dfPredImpSsX)
+```
+
+Next we will attempt to reduce the number of predictor variables. We will review the correlation between the variables and find the highly correlated ones that can be reduced.
+
+The dark blue and dark red dots indicate a string correlation, normally models do not improve if we feed them highly correlated data, therefore identifying  and removing the highly correlated data will help us reduce processing speed and improve accuracy.
+
+```{r cache=TRUE}
+#corrgram(dfModBCSX, order=TRUE,
+#         upper.panel=panel.cor, main="Correlation Matrix")
+library(corrplot)
+#install.packages("corrplot")
+correlations <- cor(dfModBCSX)
+corrplot(correlations, order = "hclust", tl.cex = 0.55)
+```
+
+We can see several very highly correlated variables. We will reduce our dataset and remove pairs that have correlation above 0.75.
+
+```{r cache=TRUE}
+hc = findCorrelation(correlations, cutoff=0.75)
+length(hc) #18 vars
+
+#Reducing
+dfModBCSRX = dfModBCSX[,-c(hc)] #Box-Cox, Center, Scale
+dfPredBCSRX = dfPredBCSX[,-c(hc)]
+
+dfModBRX = dfModBX[,-c(hc)] #Box-Cox
+dfPredBRX = dfPredBCSX[,-c(hc)]
+
+dfModSRX = dfModImpSsX[,-c(hc)] #Only Spatial Sign
+dfPredSRX = dfPredImpSsX[,-c(hc)]
+```
+
+Finalizing data
+
+```{r cache=TRUE}
+set.seed(2017)
+n75 <- floor(0.75 * nrow(dfBevMod)) #75$ of sample size
+n <- sample(seq_len(nrow(dfBevMod)), size = n75)
+
+#Box-Cox, Center, Scale
+dfTrainBCSX <- dfModBCSRX[n,]
+dfTestBCSX <- dfModBCSRX[-n,]
+
+#Box-Cox
+dfTrainBX <- dfModBX[n,]
+dfTestBX <- dfModBX[-n,]
+
+#Only Spatial Sign
+dfTrainX <- dfModSRX[n,]
+dfTestX <- dfModSRX[-n,]
+
+#Response variable
+dfTrainY <- dfModImpY[n]
+dfTestY <- dfModImpY[-n]
+```
+
+At this point data is ready and we can proceed to the modeling step.
+
+# Model Development
+
+```{r, include=FALSE}
+library(caret)
+library(tidyverse)
+library(Metrics)
+```
+
+## Nonlinear Models
+
+Using the several data sets created from our previous transformations we attempted to fit several non-linear models. Specifically, a Neural Network and MARS model. While data transformations are not always necessary for the MARS method, we will nonetheless benefit from removing data features that would be adding unncessary noise to our final models. The Neural Network can be greatly impacted by highly correlated variables. 
+
+### Neural Network
+
+Neural Networks can be thought of as models that work in similar ways to our brain. Inputs are provided and transformed at nodes by assigned weights that then feed-forward to any additional layers containing additional nodes [^1]. A drawback to this method is that without limitations on our linear combinations from one layer to another, the coefficients will have little context [^3]. 
+
+In the below code snippet, we set our seed for reproducibility, then we set `trainControl` for 3 repeats of the cross validated method and keep our resamples by setting `returnResamp = "all"`. We then manually tune our grid with the `expand.grid` function and set the Weight Decay via `.decay`, the Hidden Units via `.size`, and then prevent Bagging since we have sufficiently preprocessed our data `.bag = FALSE`. Also, since we are preforming a regression and not a classfication we set `linout` to `TRUE`. 
+
+[1] Bishop, Christopher M. Neural Networks for Pattern Recognition. Oxford: New York: Clarendon Press; Oxford University Press, 1995.
+
+[3] Kuhn, Max, and Kjell Johnson. Applied Predictive Modeling. New York: Springer, 2013.
+
+```{r, cache=TRUE}
+set.seed(1234)
+
+nnet <- function(df, y){
+  
+              fitControl <- trainControl(method = "cv", 
+                                         number = 3, 
+                                         returnResamp = "all")
+              
+              nnetGrid <- expand.grid(.decay = c(0, 0.01, .1, .5),
+                                      .size = c(5:15),
+                                      .bag = FALSE)
+    
+                 return(train(df, y, 
+                              method = "avNNet", 
+                              tuneGrid = nnetGrid,
+                              trControl = fitControl,
+                              trace = FALSE,
+                              linout = TRUE))
+}
+
+nnet.fit.bcsx <- nnet(dfTrainBCSX, dfTrainY)
+nnet.fit.bx   <- nnet(dfTrainBX,   dfTrainY)
+nnet.fit.x    <- nnet(dfTrainX,    dfTrainY)
+```
+
+Now that we have trained our models on the available data sets, we will measure the root mean squared error of all three and select the lowest. 
+
+```{r}
+list(RMSE_NNET.BCSX = RMSE(predict(nnet.fit.bcsx, dfTestBCSX), dfTestY),
+     RMSE_NNET.BCS  = RMSE(predict(nnet.fit.bx,   dfTestBX), dfTestY),
+     RMSE_NNET.X    = RMSE(predict(nnet.fit.x,    dfTestX), dfTestY))
+```
+
+Based on our RMSE results the final model chosen for the neural network is `nnet.fit.bcsx`
+
+```{r}
+nnet.fit.bcsx$finalModel
+```
+
+Further, we see that `X` and `Mnf.Flow` are the variables with the greatest importance in the model.
+
+```{r, cache=TRUE}
+varImp(nnet.fit.bcsx)
+```
+
+The grid parameters we set earlier are plotted below to visualize how tuning impacts the model performance.
+
+```{r, cache=TRUE}
+plot(nnet.fit.bcsx)
+```
+
+
+### MARS Model
+
+The Multivariate Adaptive Regression Splines or "MARS" model is a nonparametric method, i.e. we are not required to make any assumptions about any underlying distributions such as the neural network. It can achieve this by pivoting on naturally occuring breaks in the data set and essentially building a model out of many linear models developed for specific segemets of the data set [^2] [^3]. 
+
+[2] J.H. Friedman, "Multivariate adaptive regression splines", The Annals of Statistics, 19 (1991), pp. 1-141
+
+[3] Kuhn, Max, and Kjell Johnson. Applied Predictive Modeling. New York: Springer, 2013.
+
+In the below code snippet, we set our seed for reproducibility, then we set `trainControl` for 3 repeats of the cross validated method and keep our resamples by setting `returnResamp = "all"`. We then set our tune grid for 2,3, and 4 product degrees `degree= 2:4` and the number of terms possible from 20 to 60 `nprune = seq(20,60,20)`. We would not need to set these values if we intended to use the training set without any resampling or parameter tuning.
+
+```{r, cache=TRUE}
+library(caret)
+
+set.seed(1234)
+
+mars <- function(df, y){
+           
+          fitControl <- trainControl(method = "cv", 
+                                     number = 3, 
+                                     returnResamp = "all")
+
+          MARSGrid <- expand.grid(degree= 3:5, 
+                                  nprune = seq(20,60,20))
+          
+          return(train(df, y, 
+                 method = "earth", 
+                 tuneGrid = MARSGrid,
+                 trControl = fitControl))
+         }
+
+mars.fit.bcsx <- mars(dfTrainBCSX, dfTrainY)
+mars.fit.bx   <- mars(dfTrainBX,   dfTrainY)
+mars.fit.x    <- mars(dfTrainX,    dfTrainY)
+```
+
+Now that we have trained our models on the available data sets, we will measure the root mean squared error of all three and select the lowest. 
+
+```{r, cache=TRUE}
+list(RMSE_MARS.BCSX = RMSE(predict(mars.fit.bcsx, dfTestBCSX), dfTestY),
+     RMSE_MARS.BCS  = RMSE(predict(mars.fit.bx,   dfTestBX), dfTestY),
+     RMSE_MARS.X    = RMSE(predict(mars.fit.x,    dfTestX), dfTestY))
+```
+
+The model fitted to the mars.fit.bx preformed the best and is further selected to be evaluated. The model results are provided below.
+
+```{r}
+mars.fit.bx$finalModel
+```
+
+The below figure provides insight into the tuning parameters. We can see that our 5 degree model begins to outperform our 4 degree model at the max of 40 terms but the 4 degree model outperforms the 5 degree model at the 60 maximum terms. 
+
+```{r}
+plot(mars.fit.bx)
+```
+
+In our final MARS model, the variable of greatest importance is `Mnf.Flow`.
+
+```{r}
+varImp(mars.fit.bx)
+```
+
+### Model Choice
+
+Between the two non linear models the lowest RMSE measure is MARS, so we will move forward with that model. It appears that our Neural Net model may suffer from overfitting since the Neural Net has a much better RMSE on the training data set than the MARS model.
+
+```{r, cache=TRUE}
+list(RMSE_MARS = RMSE(predict(mars.fit.bx, dfTestBX), dfTestY),
+     RMSE_NNET = RMSE(predict(nnet.fit.bcsx, dfTestBCSX), dfTestY))
+```
+
