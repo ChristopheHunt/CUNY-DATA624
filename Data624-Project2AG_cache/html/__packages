@@ -8,3 +8,6 @@ corrgram
 lattice
 ggplot2
 caret
+psych
+knitr
+corrplot

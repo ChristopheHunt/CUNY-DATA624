@@ -8,8 +8,26 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning=FALSE)
 ```
 
+#Overview
+
+###Abstract
+
+The purpose of this report is to address the new regulations and to better understand the manufacturing process within ABC Beverage.  We will examine all factors involved in the production process and will attempt to identify the factors that will help us properly predict the PH levels as well us understand the influence of the various factors on the overall process.
+
+###Data used
+
+This report is using the historical data collected from approximately 2572 samples which should be sufficient for the analysis. 
+
+###Brief overview of the process
+
+We will first cleanup the data, by filling in or imputing the missing data, use various transformation methods in order to normalize the data to address issues such as outlier data points and other normalization related issues.
+
+Next we will run various models in order to identify the factors that are important to reaching out goal and once we have those we will use various models in order to estimate the PH levels and come up with a best suiting method that we feel will be best to predict the data we are looking for.
+
+We will include documented R code within the report so that it is easy to follow our research. Should you have any questions regarding the process or the code, feel free to reach out to our department.
+
 #Data Exploration
-We will load the data into a dataframe and get started
+We will get started by loading our historical data into a data frame and loading the necessary libraries.
 
 ```{r cache=TRUE}
 library(missForest)
@@ -21,17 +39,19 @@ library(knitr)
 dfBevMod <- read.csv("https://github.com/ChristopheHunt/CUNY-DATA624/raw/master/data/StudentData.csv", header = TRUE)
 dfBevPred <- read.csv("https://raw.githubusercontent.com/ChristopheHunt/CUNY-DATA624/master/data/StudentEvaluation-%20TO%20PREDICT.csv", header =TRUE)
 ```
-First we will examine the training dataset we want to see how many predictor variables we are dealing with and if we are missing any data. We see several variables with missing data, 
+
+We will examine the training dataset we want to see how many predictor variables we are dealing with and if we are missing any data. We see several variables with missing data, 
 
 ```{r cache=TRUE}
 dim(dfBevMod)
 ```
-Looks like we have a total of 32 predictor variables and a target variable. Next we will check for any missing data.
+
+It appears we have a total of 32 predictor variables and a target variable. Next we will check for any missing data.
 
 ```{r cache=TRUE}
 colSums(is.na(dfBevMod))
 ```
-We see many variables with NA's -- notably "MFR" has 212. Still, roughly 8% NA is workable, so we'll choose to impute, later. 
+We see many variables with NA's -- notably "MFR" has 212. Still, roughly 8% NA is workable, so we'll choose to use imputation process to fill in the missing data. 
 
 Also, it appears that we have one categorical variable: Brand.Code
 
@@ -40,10 +60,16 @@ Also, it appears that we have one categorical variable: Brand.Code
 #Visualizing the single categorical variable
 barchart(dfBevMod[,1], col="Gold")
 ```
+
 It appears that brand "B" occurs most frequently, followed by "D"
 
 ### Continuous and Discrete variables
+
+Next we will review all the variables we are working with in order to better understand the data they are presenting us. We can see the mean, variation and other metrics within the following table for a quick detailed reference. 
+
 ```{r}
+library(psych)
+library(knitr)
 table.desc <- describe(dfBevMod[,-1])
 table.prep <- as.matrix(table.desc)
 table.round <- round((table.prep), 2)
@@ -52,6 +78,9 @@ kable(table.round)
 
 
 ###Nominal Variable Histogram
+
+Next we will visually view each one of the factors, its easier to visually navigate through a large number of variables. We are interested to see how data is distributed for each one of the variables. Please refer to above table for more specific information. 
+
 ```{r cache=TRUE}
 dfBevModH <- dfBevMod[2:ncol(dfBevMod)] #removing factor var
 par(mfrow = c(3,5), cex = .5)
@@ -60,9 +89,11 @@ hist(dfBevModH[,i], xlab = names(dfBevMod[i]),
   main = names(dfBevModH[i]), col="grey", ylab="")
 }
 ```
-Mnf.Flow and Hyd.Pressure 1,2,3 each have many values below 0 -- possibly null-type entered values. Several variables are strongly skewed -- some of which appear to have outliers. 
 
-Exploring differences by Brand
+We can see that Mnf.Flow and Hyd.Pressure 1,2,3 each have many values below 0 -- possibly null-type entered values. Several variables are strongly skewed -- some of which appear to have outliers. 
+
+Next we want to explore differences by Brand
+
 ```{r cache=TRUE}
 BrandA <- dfBevMod[dfBevMod$Brand.Code == "A",]
 BAM <- colMeans(BrandA[,2:ncol(BrandA)], na.rm = TRUE)
@@ -78,9 +109,13 @@ BEM <- colMeans(BrandE[,2:ncol(BrandE)], na.rm = TRUE)
 combBrand <- cbind(BAM, BBM, BCM, BDM, BEM)
 combBrand
 ```
-Notable differences among brands by Hyd.Pressure4, Density, Balling, and Balling.Lvl 
+
+Notable differences exist among brands by Hyd.Pressure4, Density, Balling, and Balling.Lvl 
 
 ###Density Plot
+
+Next we will use density plots to better understand the data and look for any abnormalities.
+
 ```{r cache=TRUE}
 par(mfrow = c(3,5), cex = .5)
 for (i in colnames(dfBevModH)) {
@@ -88,9 +123,13 @@ for (i in colnames(dfBevModH)) {
    xlab = "", colramp = colorRampPalette(c("white", "red")))
  }
 ```
+
 The odd data in Mnf.Flow appears to be related to similarly zero-out data in Hyd.Pressure1, Hyd.Press2, and Hyd.Pressure3. Several other variables have dichotomous patterns in data behavior, including "Carb.Pressure1", "Filler.Level", "Usage.cont", "Carb.Flow", and "Oxygen.Filler". This leaves two options; we can alter these gaps by possibly inputing new values in, or we can use algorithms that can easily handle quick pattern shifts, such as forests and MARS.  
 
 ###BoxPlots
+
+Next we want to take a look at any outliers within our variables.  Boxplots provide a quick and effective way of view the data and look for any skew or outliers
+
 ```{r cache=TRUE}
 par(mfrow = c(3,5), cex = .5)
 for(i in colnames(dfBevModH)){
@@ -98,9 +137,13 @@ boxplot(dfBevModH[,i], xlab = names(dfBevModH[i]),
   main = names(dfBevModH[i]), col="grey", ylab="")
 }
 ```
-Again, several variables with large skews and outliers
+
+Again, several variables with large skews and outliers are present we will need to use transformation techniques later on to handle this issue.
 
 ###Principle Component Analysis
+
+Since we are dealing with 32 predictor variables and not all of them can be relevant to our study, we will need a way to filter through the variables to reduce the number of variables we are working with. This can be done with PCA
+
 ```{r cache=TRUE, warning=F}
 PCA <- function(X) {
   Xpca <- prcomp(na.omit(X), center = T, scale. = T) 
@@ -120,7 +163,8 @@ First two components account for most of the variance, although Mnf.Flow is high
 
 #Data Transformation
 
-Transform categorical variable Brand.Code
+Since Brand Code is a categorical variable, we will have to transform it to a binary so that models can use the data.
+
 ```{r cache=TRUE}
 #df_imputed$Brand.Code = NULL
 dfBevMod$Brand.Code[dfBevMod$Brand.Code == ""] <- NA
@@ -144,7 +188,10 @@ dfBevPred$Brand.Code <- NULL
 ```
 
 ###Imputation
-Next we will use the missForest library to impute the missing variable of the predictor variables
+Next we will use the missForest library to impute the missing variable of the predictor variables. The library will use the best method in filling in the missing data.
+
+Please note: We need to perform this step in order to have a complete dataset. Most models will not run on a data set with missing data. This is a common step in data science and filling in the data does not compromise the final results
+
 ```{r cache=TRUE}
 #dfImpMod = missForest(dfBevMod)
 #dfImpMod$OOBerror #error rate looks good?
@@ -163,7 +210,9 @@ dfPredImp <- read.csv("https://raw.githubusercontent.com/ChristopheHunt/CUNY-DAT
 ```
 
 ###Preprocessing
-Due to the different types of model imputs (some preprocess, other's dont), creating a range of preprocessed variables
+
+Next we will preprocess the data using various methods, this step will handle the issues of outliers and will get the data in the final stage where it can be used with the predictive models.  Due to the different types of model inputs (some preprocess, other's dont), we will be creating a range of preprocessed variables
+
 ```{r cache=TRUE}
 
 dfModImpX <- dfModImp[,!(names(dfModImp) == "PH")]
@@ -197,18 +246,22 @@ dfModBCSPX <- predict(transModBCSP, dfModImpSsX)
 transPredBCSP <- preProcess(dfPredImpSsX, method = c("BoxCox", "center", "scale", "pca")) #23 BC, 35 centered, 35 scaled
 dfPredBCSPX <- predict(transPredBCSP, dfPredImpSsX)
 ```
-Attempt to reduce the number of predictor variables. We will review the correlation between the variables and find the highly correlated ones that can be reduced.
+
+Next we will attempt to reduce the number of predictor variables. We will review the correlation between the variables and find the highly correlated ones that can be reduced.
+
+The dark blue and dark red dots indicate a string correlation, normally models do not improve if we feed them highly correlated data, therefore identifying  and removing the highly correlated data will help us reduce processing speed and improve accuracy.
+
 ```{r cache=TRUE}
 #corrgram(dfModBCSX, order=TRUE,
 #         upper.panel=panel.cor, main="Correlation Matrix")
 library(corrplot)
-install.packages("corrplot")
+#install.packages("corrplot")
 correlations <- cor(dfModBCSX)
 corrplot(correlations, order = "hclust", tl.cex = 0.55)
 ```
-Several very highly correlated variables.
 
-Next we will reduce our dataset and remove pairs that have correlation above 0.75
+We can see several very highly correlated variables. We will reduce our dataset and remove pairs that have correlation above 0.75.
+
 ```{r cache=TRUE}
 hc = findCorrelation(correlations, cutoff=0.75)
 length(hc) #18 vars
@@ -224,7 +277,8 @@ dfModSRX = dfModImpSsX[,-c(hc)] #Only Spatial Sign
 dfPredSRX = dfPredImpSsX[,-c(hc)]
 ```
 
-Ready variables for modelling
+Finallizing data
+
 ```{r cache=TRUE}
 set.seed(2017)
 n75 <- floor(0.75 * nrow(dfBevMod)) #75$ of sample size
@@ -246,3 +300,5 @@ dfTestX <- dfModSRX[-n,]
 dfTrainY <- dfModImpY[n]
 dfTestY <- dfModImpY[-n]
 ```
+
+At this point data is ready and we can proceed to the modeling step.
