@@ -451,3 +451,188 @@ list(RMSE_MARS = RMSE(predict(mars.fit.bx, dfTestBX), dfTestY),
      RMSE_NNET = RMSE(predict(nnet.fit.bcsx, dfTestBCSX), dfTestY))
 ```
 
+
+```{r, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(caret)
+library(mlbench)
+library(MASS)
+library(AppliedPredictiveModeling)
+library(lars)
+library(pls)
+library(elasticnet)
+library(rpart)
+library(e1071)
+```
+
+```{r cache=TRUE}
+dfModImp <- read.csv("https://raw.githubusercontent.com/ChristopheHunt/CUNY-DATA624/master/data/TrainImputeData.csv")
+dfPredImp <- read.csv("https://raw.githubusercontent.com/ChristopheHunt/CUNY-DATA624/master/data/PredictImputeData.csv")
+```
+
+Partial Least Squares Regression (PLSR) is a multivatiate method related to Principal Components Regression (PCR) that differs because it finds a linear regression that projects predicted and observed values to a new space. These methods are helpful in situations where there are many potentially correlated predictor variables and relatively small samples. In theory, PLSR should be a better method than PCA, because if too few components are selected there could potentially be bad predictions. However, in practice, there doesn't appear to be much difference in most situations as there are very similar prediction accuracies.
+
+```{r cache=TRUE}
+set.seed(1234)
+plsFit = plsr(PH ~ ., data=dfModImp, validation="CV")
+pls.pred = predict(plsFit, dfPredImp[1:5, ], ncomp=1:2)
+
+pls.pred
+
+validationplot(plsFit, val.type="RMSEP")
+validationplot(plsFit, val.type="R2")
+
+pls.RMSEP = RMSEP(plsFit, estimate="CV")
+plot(pls.RMSEP, main="RMSEP PLS PH", xlab="Components")
+min_comp = which.min(pls.RMSEP$val)
+points(min_comp, min(pls.RMSEP$val), pch=1, col="red", cex=1.5)
+
+min_comp
+
+plot(plsFit, ncomp=30, asp=1, line=TRUE)
+
+pls.pred2 = predict(plsFit, dfPredImp, ncomp=30)
+pls.pred2
+```
+
+With the vast amounts of algorithms available, several should be explored to help make accurate predictions on the dataset. Linear regression is often the simple first step as these models are fast to train albeit with a high bias. The final models are typically easier to analyze and if they are accurate enough it may save moving on to more complex non-linear models. In this example we will start with a simple Generalized Linear Model (GLM) to perform a logistic regression, mix in more complex models then compare the results. A 10-fold cross validation is used for comparison and although not utilized below, a repeated cross validation can be set although it should be noted that repeating a cross valdation with exactly the same splitting will yield exactly the same result for every repetition. 
+Non-linear algorithms make fewer assumptions about the function being modeled so this will result in higher variance but often result in higher accuracy. Because of its flexibility these models tend to be slower to train and may require increased memory resources. We will explore a Neural Network and MARS model in further detail but will take a quick look at a k-Nearest Neigbor (KNN) and a Support Vector Machine (SVM) algorithm below.
+
+Classification and Regression Trees (CART) and a Bagged CART are also compared below. CART split attributes based on values that minimize a loss function such as RMSE in the below example. Bagging CART is an ensemble method, which we will explore further later, that creates multiple models of the same type from different subsets of the same data. The predictions are then combined together for better results. This approach is particularly useful for high variance methods such as decision trees.
+
+```{r}
+trainControl <- trainControl(method = "cv", number = 10)
+
+#GLM
+set.seed(1234)
+fit.glm <- train(PH~., data=dfModImp, method="glm", metric="RMSE", trControl=trainControl,
+           tuneLength = 5, preProc = c("center", "scale"))
+fit.glm
+
+#SVM
+set.seed(1234)
+fit.svm <- train(PH~., data=dfModImp, method="svmLinear3", metric="RMSE", trControl=trainControl,                               tuneLength = 5, svr_eps = .1, preProc = c("center", "scale"))
+fit.svm
+
+#KNN
+set.seed(1234)
+fit.knn <- train(PH~., data=dfModImp, method="knn", metric="RMSE", trControl=trainControl,
+          tuneLength = 5, preProc = c("center", "scale"))
+fit.knn
+
+#CART
+set.seed(1234)
+fit.cart <- train(PH~., data=dfModImp, method="rpart", metric="RMSE", trControl=trainControl,
+          tuneLength = 5, preProc = c("center", "scale"))
+fit.cart
+
+#Bagged CART
+set.seed(1234)
+fit.bagcart <- train(PH~., data=dfModImp, method="treebag", metric="RMSE", trControl=trainControl,
+          tuneLength = 5, preProc = c("center", "scale"))
+fit.bagcart
+
+#Compare results of the algorithms we ran
+results <- resamples(list(GLM=fit.glm, SVM=fit.svm, KNN=fit.knn, CART=fit.cart, BaggedCart=fit.bagcart))
+
+summary(results)
+```
+
+The Bagged CART performed the best from the above models with a mean RMSE of 0.1060510 and a mean R-Squared of 0.6279657. We will explore further to see if we can find better results.
+
+Ensemble Regression
+Ensemble methods generally refer to models combining predictions, either in classification or regression, of several base estimators to improve robustness over a single estimator. The goal of ensemble regression is to combine many models in order to increase the prediction accuracy in learning problems with a numerical target. The focus will be on regression not classification with Random Forest and Gradient Boosting (GBM).
+
+Regression trees tend to be unstable, a seemingly insignificant change in the data can have a large impact on the model. The Random Forest can help solve this problem through bagging. Bagging originates from bootstrap aggregating which is a machine learning techique proposed by Breiman to stabalize potentially unstable estimators. Essentially, each variable is given several opportunities to be in the model across multiple bootstrap samples and the final forecast will be the average forecast across all samples.
+
+Gradient Boosting (GBM) is another ensemble method explored that is similarly applied to regression and classification problems. Boosting originated from the notion that weak learners can become better. The first successful boosting algorithm was Adaptive Boosting or AdaBoost. Later, based on this framework, GBM attempted to solve a numerical optimization problem by minimizing the loss of the model by adding weak learners using a gradient descent. These class of algorithms were described as stage-wise additive because a new weak learner is added incrementally, simultaneaously an existing weak learner is left unchanged.
+
+Random Forest
+
+```{r, cache=TRUE}
+
+library(randomForest)
+
+set.seed(1234)
+
+rf <- function(df,y){
+       fitControl <- trainControl(method = "cv",
+       number = 10, #5folds)
+                           
+rfgrid <- expand.grid(interaction.depth = 2,
+            n.trees = 500,
+            shrinkage = 0.1,
+            n.minobsinnode = 10))
+  
+return(train(df, y, 
+             method = "randomForest", 
+             tuneGrid = rfgrid, 
+             trControl = fitControl))
+}
+
+rf.fit.bcsx <- randomForest(dfTrainBCSX, dfTrainY)
+rf.fit.bx   <- randomForest(dfTrainBX, dfTrainY)
+rf.fit.x    <- randomForest(dfTrainX,    dfTrainY)
+```
+
+```{r, cache=TRUE}
+list(RMSE_RF.BCSX = RMSE(predict(rf.fit.bcsx, dfTestBCSX), dfTestY),
+     RMSE_RF.BCS  = RMSE(predict(rf.fit.bx, dfTestBX), dfTestY),
+     RMSE_RF.X    = RMSE(predict(rf.fit.x, dfTestX), dfTestY))
+```
+
+```{r, cache=TRUE}
+summary(rf.fit.bx, digit=3)
+```
+
+```{r, cache=TRUE}
+#varImp(rf.fit.bx)
+#Error in varImp[, "%IncMSE"] : subscript out of bounds
+```
+
+```{r, cache=TRUE}
+plot(rf.fit.bx)
+```
+
+GBM
+```{r, cache=TRUE}
+
+library(caret)
+
+set.seed(1234)
+
+gbm <- function(df,y){
+       fitControl <- trainControl(method = "cv",
+       number = 10)
+                           
+gbmgrid <- expand.grid(interaction.depth = 2,
+            n.trees = 500,
+            shrinkage = 0.1,
+            n.minobsinnode = 10)
+  
+return(train(df, y, 
+             method = "gbm", 
+             tuneGrid = gbmgrid, 
+             trControl = fitControl))
+}
+
+gbm.fit.bcsx <- gbm(dfTrainBCSX, dfTrainY)
+gbm.fit.bx   <- gbm(dfTrainBX, dfTrainY)
+gbm.fit.x    <- gbm(dfTrainX,    dfTrainY)
+```
+
+```{r, cache=TRUE}
+list(RMSE_GBM.BCSX = RMSE(predict(gbm.fit.bcsx, dfTestBCSX), dfTestY),
+     RMSE_GBM.BCS  = RMSE(predict(gbm.fit.bx, dfTestBX), dfTestY),
+     RMSE_GBM.X    = RMSE(predict(gbm.fit.x, dfTestX), dfTestY))
+```
+
+```{r, cache=TRUE}
+summary(gbm.fit.bx, digit=3)
+```
+
+```{r, cache=TRUE}
+#varImp(gbm.fit.bx)
+```
+
+GBM appears to perform better than the group of models, specifically Bagged CART, with a RMSE of 0.1029799, but we see an improvement with Random Forest, 0.09255377 RMSE.
