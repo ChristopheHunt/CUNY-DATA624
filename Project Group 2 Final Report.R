@@ -35,7 +35,7 @@ BrandE <- dfBevMod[dfBevMod$Brand.Code == "",]
 BEM <- colMeans(BrandE[,2:ncol(BrandE)], na.rm = TRUE)
 
 combBrand <- cbind(BAM, BBM, BCM, BDM, BEM)
-combBrand
+round(combBrand, 4)
 par(mfrow = c(3,5), cex = .5)
 for (i in colnames(dfBevModH)) {
  smoothScatter(dfBevModH[,i], main = names(dfBevModH[i]), ylab = "", 
@@ -137,7 +137,7 @@ dfModBCSRX = dfModBCSX[,-c(hc)] #Box-Cox, Center, Scale
 dfPredBCSRX = dfPredBCSX[,-c(hc)]
 
 dfModBRX = dfModBX[,-c(hc)] #Box-Cox
-dfPredBRX = dfPredBCSX[,-c(hc)]
+dfPredBRX = dfPredBX[,-c(hc)]
 
 dfModSRX = dfModImpSsX[,-c(hc)] #Only Spatial Sign
 dfPredSRX = dfPredImpSsX[,-c(hc)]
@@ -150,8 +150,8 @@ dfTrainBCSX <- dfModBCSRX[n,]
 dfTestBCSX <- dfModBCSRX[-n,]
 
 #Box-Cox
-dfTrainBX <- dfModBX[n,]
-dfTestBX <- dfModBX[-n,]
+dfTrainBX <- dfModBRX[n,]
+dfTestBX <- dfModBRX[-n,]
 
 #Only Spatial Sign
 dfTrainX <- dfModSRX[n,]
@@ -160,6 +160,7 @@ dfTestX <- dfModSRX[-n,]
 #Response variable
 dfTrainY <- dfModImpY[n]
 dfTestY <- dfModImpY[-n]
+
 knitr::opts_chunk$set(echo = TRUE)
 library(caret)
 library(mlbench)
@@ -270,7 +271,8 @@ gbmgrid <- expand.grid(interaction.depth = 2,
 return(train(df, y, 
              method = "gbm", 
              tuneGrid = gbmgrid, 
-             trControl = fitControl))
+             trControl = fitControl,
+             verbose = FALSE))
 }
 
 gbm.fit.bcsx <- gbm(dfTrainBCSX, dfTrainY)
@@ -281,6 +283,8 @@ list(RMSE_GBM.BCSX = RMSE(predict(gbm.fit.bcsx, dfTestBCSX), dfTestY),
      RMSE_GBM.X    = RMSE(predict(gbm.fit.x, dfTestX), dfTestY))
 summary(gbm.fit.bx, digit=3)
 #varImp(gbm.fit.bx)
+list(RMSE_GBM.BCS  = RMSE(predict(gbm.fit.bx, dfTestBX), dfTestY),
+     RMSE_RF.BCS  = RMSE(predict(rf.fit.bcsx, dfTestBCSX), dfTestY))
 library(caret)
 library(tidyverse)
 library(Metrics)

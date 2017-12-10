@@ -11,6 +11,14 @@ caret
 psych
 knitr
 corrplot
+mlbench
+MASS
+AppliedPredictiveModeling
+lars
+pls
+elasticnet
+rpart
+e1071
 tidyverse
 tibble
 tidyr
@@ -24,11 +32,3 @@ plotrix
 TeachingDemos
 plotmo
 earth
-mlbench
-MASS
-AppliedPredictiveModeling
-lars
-pls
-elasticnet
-rpart
-e1071

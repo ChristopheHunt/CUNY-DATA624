@@ -110,7 +110,7 @@ BrandE <- dfBevMod[dfBevMod$Brand.Code == "",]
 BEM <- colMeans(BrandE[,2:ncol(BrandE)], na.rm = TRUE)
 
 combBrand <- cbind(BAM, BBM, BCM, BDM, BEM)
-combBrand
+round(combBrand, 4)
 ```
 
 Notable differences exist among brands by Hyd.Pressure4, Density, Balling, and Balling.Lvl 
@@ -164,7 +164,7 @@ PCA(dfBevModH)
 ```
 First two components account for most of the variance, although Mnf.Flow is highly prioritized, so I'm concerned that it may be a function of the null-like values.  
 
-#Data Transformation
+# Data Transformation
 
 Since Brand Code is a categorical variable, we will have to transform it to a binary so that models can use the data.
 
@@ -190,7 +190,7 @@ dfBevPred$D <- ifelse(dfBevPred$Brand.Code == "D", 1, 0)
 dfBevPred$Brand.Code <- NULL
 ```
 
-###Imputation
+### Imputation
 Next we will use the missForest library to impute the missing variable of the predictor variables. The library will use the best method in filling in the missing data.
 
 Please note: We need to perform this step in order to have a complete dataset. Most models will not run on a data set with missing data. This is a common step in data science and filling in the data does not compromise the final results
@@ -274,7 +274,7 @@ dfModBCSRX = dfModBCSX[,-c(hc)] #Box-Cox, Center, Scale
 dfPredBCSRX = dfPredBCSX[,-c(hc)]
 
 dfModBRX = dfModBX[,-c(hc)] #Box-Cox
-dfPredBRX = dfPredBCSX[,-c(hc)]
+dfPredBRX = dfPredBX[,-c(hc)]
 
 dfModSRX = dfModImpSsX[,-c(hc)] #Only Spatial Sign
 dfPredSRX = dfPredImpSsX[,-c(hc)]
@@ -292,8 +292,8 @@ dfTrainBCSX <- dfModBCSRX[n,]
 dfTestBCSX <- dfModBCSRX[-n,]
 
 #Box-Cox
-dfTrainBX <- dfModBX[n,]
-dfTestBX <- dfModBX[-n,]
+dfTrainBX <- dfModBRX[n,]
+dfTestBX <- dfModBRX[-n,]
 
 #Only Spatial Sign
 dfTrainX <- dfModSRX[n,]
@@ -308,8 +308,8 @@ At this point data is ready and we can proceed to the modeling step.
 
 # Model Development
 
-
 ```{r, include=FALSE}
+
 knitr::opts_chunk$set(echo = TRUE)
 library(caret)
 library(mlbench)
@@ -402,7 +402,7 @@ Regression trees tend to be unstable, a seemingly insignificant change in the da
 
 Gradient Boosting (GBM) is another ensemble method explored that is similarly applied to regression and classification problems. Boosting originated from the notion that weak learners can become better. The first successful boosting algorithm was Adaptive Boosting or AdaBoost. Later, based on this framework, GBM attempted to solve a numerical optimization problem by minimizing the loss of the model by adding weak learners using a gradient descent. These class of algorithms were described as stage-wise additive because a new weak learner is added incrementally, simultaneaously an existing weak learner is left unchanged.
 
-## Regression Trees and Rule-based 
+## Regression Trees and Rule-based Models
 
 Random Forest
 
@@ -466,7 +466,8 @@ gbmgrid <- expand.grid(interaction.depth = 2,
 return(train(df, y, 
              method = "gbm", 
              tuneGrid = gbmgrid, 
-             trControl = fitControl))
+             trControl = fitControl,
+             verbose = FALSE))
 }
 
 gbm.fit.bcsx <- gbm(dfTrainBCSX, dfTrainY)
@@ -488,7 +489,14 @@ summary(gbm.fit.bx, digit=3)
 #varImp(gbm.fit.bx)
 ```
 
+### Best Performing Regression Trees and Rule-based Models
+
 GBM appears to perform better than the group of models, specifically Bagged CART, with a RMSE of 0.1029799, but we see an improvement with Random Forest, 0.09255377 RMSE.
+
+```{r, cache=TRUE}
+list(RMSE_GBM.BCS  = RMSE(predict(gbm.fit.bx, dfTestBX), dfTestY),
+     RMSE_RF.BCS  = RMSE(predict(rf.fit.bcsx, dfTestBCSX), dfTestY))
+```
 
 
 ```{r, include=FALSE}
@@ -507,9 +515,9 @@ Neural Networks can be thought of as models that work in similar ways to our bra
 
 In the below code snippet, we set our seed for reproducibility, then we set `trainControl` for 3 repeats of the cross validated method and keep our resamples by setting `returnResamp = "all"`. We then manually tune our grid with the `expand.grid` function and set the Weight Decay via `.decay`, the Hidden Units via `.size`, and then prevent Bagging since we have sufficiently preprocessed our data `.bag = FALSE`. Also, since we are preforming a regression and not a classfication we set `linout` to `TRUE`. 
 
-[1] Bishop, Christopher M. Neural Networks for Pattern Recognition. Oxford: New York: Clarendon Press; Oxford University Press, 1995.
+[^1] Bishop, Christopher M. Neural Networks for Pattern Recognition. Oxford: New York: Clarendon Press; Oxford University Press, 1995.
 
-[3] Kuhn, Max, and Kjell Johnson. Applied Predictive Modeling. New York: Springer, 2013.
+[^3] Kuhn, Max, and Kjell Johnson. Applied Predictive Modeling. New York: Springer, 2013.
 
 ```{r, cache=TRUE}
 set.seed(1234)
@@ -568,9 +576,9 @@ plot(nnet.fit.bcsx)
 
 The Multivariate Adaptive Regression Splines or "MARS" model is a nonparametric method, i.e. we are not required to make any assumptions about any underlying distributions such as the neural network. It can achieve this by pivoting on naturally occuring breaks in the data set and essentially building a model out of many linear models developed for specific segemets of the data set [^2] [^3]. 
 
-[2] J.H. Friedman, "Multivariate adaptive regression splines", The Annals of Statistics, 19 (1991), pp. 1-141
+[^2] J.H. Friedman, "Multivariate adaptive regression splines", The Annals of Statistics, 19 (1991), pp. 1-141
 
-[3] Kuhn, Max, and Kjell Johnson. Applied Predictive Modeling. New York: Springer, 2013.
+[^3] Kuhn, Max, and Kjell Johnson. Applied Predictive Modeling. New York: Springer, 2013.
 
 In the below code snippet, we set our seed for reproducibility, then we set `trainControl` for 3 repeats of the cross validated method and keep our resamples by setting `returnResamp = "all"`. We then set our tune grid for 2,3, and 4 product degrees `degree= 2:4` and the number of terms possible from 20 to 60 `nprune = seq(20,60,20)`. We would not need to set these values if we intended to use the training set without any resampling or parameter tuning.
 
@@ -625,7 +633,7 @@ In our final MARS model, the variable of greatest importance is `Mnf.Flow`.
 varImp(mars.fit.bx)
 ```
 
-### Nonlinear Model Choice
+### Best Performing Nonlinear Model
 
 Between the two non linear models the lowest RMSE measure is MARS, so we will move forward with that model. It appears that our Neural Net model may suffer from overfitting since the Neural Net has a much better RMSE on the training data set than the MARS model.
 
@@ -634,7 +642,15 @@ list(RMSE_MARS = RMSE(predict(mars.fit.bx, dfTestBX), dfTestY),
      RMSE_NNET = RMSE(predict(nnet.fit.bcsx, dfTestBCSX), dfTestY))
 ```
 
-#
+# Model Selection
+
+In order to select our most appropriate model we will use the RSME as our selection criteria. While 
+
+## Final Model
+
+
+# Predictions
+
 
 # Appendix A
 
