@@ -283,9 +283,8 @@ list(RMSE_GBM.BCSX = RMSE(predict(gbm.fit.bcsx, dfTestBCSX), dfTestY),
      RMSE_GBM.BCS  = RMSE(predict(gbm.fit.bx, dfTestBX), dfTestY),
      RMSE_GBM.X    = RMSE(predict(gbm.fit.x, dfTestX), dfTestY))
 summary(gbm.fit.bx, digit=3)
-#varImp(gbm.fit.bx)
-list(RMSE_GBM.BCS  = RMSE(predict(gbm.fit.bx, dfTestBX), dfTestY),
-     RMSE_RF.BCS  = RMSE(predict(rf.fit.bcsx, dfTestBCSX), dfTestY))
+list(RMSE_GBM = RMSE(predict(gbm.fit.bcsx, dfTestBCSX), dfTestY),
+     RMSE_RF  = RMSE(predict(rf.fit.x, dfTestX), dfTestY))
 library(caret)
 library(tidyverse)
 library(Metrics)
@@ -343,12 +342,15 @@ mars.fit.x    <- mars(dfTrainX,    dfTrainY)
 list(RMSE_MARS.BCSX = RMSE(predict(mars.fit.bcsx, dfTestBCSX), dfTestY),
      RMSE_MARS.BCS  = RMSE(predict(mars.fit.bx,   dfTestBX), dfTestY),
      RMSE_MARS.X    = RMSE(predict(mars.fit.x,    dfTestX), dfTestY))
-mars.fit.bx$finalModel
-plot(mars.fit.bx)
-varImp(mars.fit.bx)
-list(RMSE_MARS = RMSE(predict(mars.fit.bx, dfTestBX), dfTestY),
+mars.fit.bcsx$finalModel
+plot(mars.fit.bcsx)
+varImp(mars.fit.bcsx)
+list(RMSE_MARS = RMSE(predict(mars.fit.bcsx, dfTestBCSX), dfTestY),
      RMSE_NNET = RMSE(predict(nnet.fit.bcsx, dfTestBCSX), dfTestY))
-#prediction <- predict(rf.fit.bcsx, dfPredBRX)
-#cbind(prediction, dfPredImp)
+library(tidyverse)
+library(xlsx)
+dfPredImp$PH <- predict(rf.fit.x, dfPredBX)
+dfPredImp <- dfPredImp %>%  dplyr::select(PH, everything())
+write.xlsx(dfPredImp, "./data/StudentEvaluation- TO PREDICT wPredictions.xlsx", row.names = FALSE)
 sessionInfo()
 ## NA

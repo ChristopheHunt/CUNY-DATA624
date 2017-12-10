@@ -309,6 +309,8 @@ At this point data is ready and we can proceed to the modeling step.
 
 # Model Development
 
+## Regression Trees and Rule-based Models
+
 ```{r, include=FALSE}
 
 knitr::opts_chunk$set(echo = TRUE)
@@ -323,7 +325,7 @@ library(rpart)
 library(e1071)
 ```
 
-## Partial Least Squares Regression (PLSR)
+### Partial Least Squares Regression (PLSR)
 
 Partial Least Squares Regression (PLSR) is a multivatiate method related to Principal Components Regression (PCR) that differs because it finds a linear regression that projects predicted and observed values to a new space. These methods are helpful in situations where there are many potentially correlated predictor variables and relatively small samples. In theory, PLSR should be a better method than PCA, because if too few components are selected there could potentially be bad predictions. However, in practice, there doesn't appear to be much difference in most situations as there are very similar prediction accuracies.
 
@@ -355,6 +357,8 @@ With the vast amounts of algorithms available, several should be explored to hel
 Non-linear algorithms make fewer assumptions about the function being modeled so this will result in higher variance but often result in higher accuracy. Because of its flexibility these models tend to be slower to train and may require increased memory resources. We will explore a Neural Network and MARS model in further detail but will take a quick look at a k-Nearest Neigbor (KNN) and a Support Vector Machine (SVM) algorithm below.
 
 Classification and Regression Trees (CART) and a Bagged CART are also compared below. CART split attributes based on values that minimize a loss function such as RMSE in the below example. Bagging CART is an ensemble method, which we will explore further later, that creates multiple models of the same type from different subsets of the same data. The predictions are then combined together for better results. This approach is particularly useful for high variance methods such as decision trees.
+
+### GLM, SVM, KNN, CART, Bagged CART
 
 ```{r}
 trainControl <- trainControl(method = "cv", number = 10)
@@ -394,7 +398,7 @@ results <- resamples(list(GLM=fit.glm, SVM=fit.svm, KNN=fit.knn, CART=fit.cart, 
 summary(results)
 ```
 
-The Bagged CART performed the best from the above models with a mean RMSE of 0.1060510 and a mean R-Squared of 0.6279657. We will explore further to see if we can find better results.
+KNN performed the best from the above models with a mean RMSE of 0.1187173 and a mean R-Squared of 0.5315663. We will explore further to see if we can find better results.
 
 Ensemble Regression
 Ensemble methods generally refer to models combining predictions, either in classification or regression, of several base estimators to improve robustness over a single estimator. The goal of ensemble regression is to combine many models in order to increase the prediction accuracy in learning problems with a numerical target. The focus will be on regression not classification with Random Forest and Gradient Boosting (GBM).
@@ -403,9 +407,7 @@ Regression trees tend to be unstable, a seemingly insignificant change in the da
 
 Gradient Boosting (GBM) is another ensemble method explored that is similarly applied to regression and classification problems. Boosting originated from the notion that weak learners can become better. The first successful boosting algorithm was Adaptive Boosting or AdaBoost. Later, based on this framework, GBM attempted to solve a numerical optimization problem by minimizing the loss of the model by adding weak learners using a gradient descent. These class of algorithms were described as stage-wise additive because a new weak learner is added incrementally, simultaneaously an existing weak learner is left unchanged.
 
-## Regression Trees and Rule-based Models
-
-Random Forest
+### Random Forest
 
 ```{r, cache=TRUE}
 
@@ -447,7 +449,7 @@ rf.fit.bcsx
 plot(rf.fit.bx)
 ```
 
-GBM
+### GBM
 
 ```{r, cache=TRUE}
 
@@ -486,17 +488,13 @@ list(RMSE_GBM.BCSX = RMSE(predict(gbm.fit.bcsx, dfTestBCSX), dfTestY),
 summary(gbm.fit.bx, digit=3)
 ```
 
-```{r, cache=TRUE}
-#varImp(gbm.fit.bx)
-```
-
 ### Best Performing Regression Trees and Rule-based Models
 
-GBM appears to perform better than the group of models, specifically Bagged CART, with a RMSE of 0.1029799, but we see an improvement with Random Forest, 0.09756769 RMSE.
+We see an improvement with Random Forest, 0.112871 RMSE but GBM does not appear to perform better than the group of models with a RMSE of 0.1246051.
 
 ```{r, cache=TRUE}
-list(RMSE_GBM.BCS  = RMSE(predict(gbm.fit.bx, dfTestBX), dfTestY),
-     RMSE_RF.BCS  = RMSE(predict(rf.fit.bcsx, dfTestBCSX), dfTestY))
+list(RMSE_GBM = RMSE(predict(gbm.fit.bcsx, dfTestBCSX), dfTestY),
+     RMSE_RF  = RMSE(predict(rf.fit.x, dfTestX), dfTestY))
 ```
 
 ```{r, include=FALSE}
@@ -618,27 +616,27 @@ list(RMSE_MARS.BCSX = RMSE(predict(mars.fit.bcsx, dfTestBCSX), dfTestY),
 The model fitted to the mars.fit.bx preformed the best and is further selected to be evaluated. The model results are provided below.
 
 ```{r}
-mars.fit.bx$finalModel
+mars.fit.bcsx$finalModel
 ```
 
-The below figure provides insight into the tuning parameters. We can see that our 5 degree model begins to outperform our 4 degree model at the max of 40 terms but the 4 degree model outperforms the 5 degree model at the 60 maximum terms. 
+The below figure provides insight into the tuning parameters. We can see that our 5 degree model outperforms our 4 degree model initially, but the 4 degree model begins to improve on RMSE at 30 terms with max performance at 40 terms for the 4 degree model. 
 
 ```{r}
-plot(mars.fit.bx)
+plot(mars.fit.bcsx)
 ```
 
 In our final MARS model, the variable of greatest importance is `Mnf.Flow`.
 
 ```{r}
-varImp(mars.fit.bx)
+varImp(mars.fit.bcsx)
 ```
 
 ### Best Performing Nonlinear Model
 
-Between the two non linear models the lowest RMSE measure is the Neural Net, so if we were only interested in nonlinear models we would orward with the Neural Net model. Although, it appears that our Neural Net model may suffer from overfitting since the Neural Net has a much better RMSE on the training data set than the MARS model.
+Between the two non linear models the lowest RMSE measure is the Neural Net, so if we were only interested in nonlinear models we would onward with the Neural Net model. Although, it appears that our Neural Net model may suffer from overfitting since the Neural Net has significantly better RMSE on the training data set than the MARS model.
 
 ```{r, cache=TRUE}
-list(RMSE_MARS = RMSE(predict(mars.fit.bx, dfTestBX), dfTestY),
+list(RMSE_MARS = RMSE(predict(mars.fit.bcsx, dfTestBCSX), dfTestY),
      RMSE_NNET = RMSE(predict(nnet.fit.bcsx, dfTestBCSX), dfTestY))
 ```
 
@@ -651,11 +649,15 @@ In order to select our most appropriate model we will use the RSME as our select
 
 # Predictions
 
-```{r}
-#prediction <- predict(rf.fit.bcsx, dfPredBRX)
-#cbind(prediction, dfPredImp)
-```
+Our predictions are contained in file StudentEvaluation- TO PREDICT wPredictions.xlsx attached. Also, they are available online at 
 
+```{r}
+library(tidyverse)
+library(xlsx)
+dfPredImp$PH <- predict(rf.fit.x, dfPredBX)
+dfPredImp <- dfPredImp %>%  dplyr::select(PH, everything())
+write.xlsx(dfPredImp, "./data/StudentEvaluation- TO PREDICT wPredictions.xlsx", row.names = FALSE)
+```
 
 # Appendix A
 
