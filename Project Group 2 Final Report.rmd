@@ -196,6 +196,7 @@ Next we will use the missForest library to impute the missing variable of the pr
 Please note: We need to perform this step in order to have a complete dataset. Most models will not run on a data set with missing data. This is a common step in data science and filling in the data does not compromise the final results
 
 ```{r cache=TRUE}
+library(tidyverse)
 #dfImpMod = missForest(dfBevMod)
 #dfImpMod$OOBerror #error rate looks good?
 #dfModImp <- dfImpMod$ximp
@@ -208,8 +209,8 @@ Please note: We need to perform this step in order to have a complete dataset. M
 #write.csv(dfPredImp, "PredictImputeData.csv")
 
 #Stored current imputation results on github to quicken knitr iterations
-dfModImp <- read.csv("https://raw.githubusercontent.com/ChristopheHunt/CUNY-DATA624/master/data/TrainImputeData.csv")
-dfPredImp <- read.csv("https://raw.githubusercontent.com/ChristopheHunt/CUNY-DATA624/master/data/PredictImputeData.csv")
+dfModImp <- read.csv("https://raw.githubusercontent.com/ChristopheHunt/CUNY-DATA624/master/data/TrainImputeData.csv") %>% dplyr::select(-X)
+dfPredImp <- read.csv("https://raw.githubusercontent.com/ChristopheHunt/CUNY-DATA624/master/data/PredictImputeData.csv") %>% dplyr::select(-X)
 ```
 
 ###Preprocessing
@@ -346,7 +347,7 @@ min_comp
 plot(plsFit, ncomp=30, asp=1, line=TRUE)
 
 pls.pred2 = predict(plsFit, dfPredImp, ncomp=30)
-pls.pred2
+summary(pls.pred2)
 ```
 
 With the vast amounts of algorithms available, several should be explored to help make accurate predictions on the dataset. Linear regression is often the simple first step as these models are fast to train albeit with a high bias. The final models are typically easier to analyze and if they are accurate enough it may save moving on to more complex non-linear models. In this example we will start with a simple Generalized Linear Model (GLM) to perform a logistic regression, mix in more complex models then compare the results. A 10-fold cross validation is used for comparison and although not utilized below, a repeated cross validation can be set although it should be noted that repeating a cross valdation with exactly the same splitting will yield exactly the same result for every repetition. 
@@ -439,7 +440,7 @@ list(RMSE_RF.BCSX = RMSE(predict(rf.fit.bcsx, dfTestBCSX), dfTestY),
 ```
 
 ```{r, cache=TRUE}
-summary(rf.fit.bx, digit=3)
+rf.fit.bcsx
 ```
 
 ```{r, cache=TRUE}
@@ -491,13 +492,12 @@ summary(gbm.fit.bx, digit=3)
 
 ### Best Performing Regression Trees and Rule-based Models
 
-GBM appears to perform better than the group of models, specifically Bagged CART, with a RMSE of 0.1029799, but we see an improvement with Random Forest, 0.09255377 RMSE.
+GBM appears to perform better than the group of models, specifically Bagged CART, with a RMSE of 0.1029799, but we see an improvement with Random Forest, 0.09756769 RMSE.
 
 ```{r, cache=TRUE}
 list(RMSE_GBM.BCS  = RMSE(predict(gbm.fit.bx, dfTestBX), dfTestY),
      RMSE_RF.BCS  = RMSE(predict(rf.fit.bcsx, dfTestBCSX), dfTestY))
 ```
-
 
 ```{r, include=FALSE}
 library(caret)
@@ -635,7 +635,7 @@ varImp(mars.fit.bx)
 
 ### Best Performing Nonlinear Model
 
-Between the two non linear models the lowest RMSE measure is MARS, so we will move forward with that model. It appears that our Neural Net model may suffer from overfitting since the Neural Net has a much better RMSE on the training data set than the MARS model.
+Between the two non linear models the lowest RMSE measure is the Neural Net, so if we were only interested in nonlinear models we would orward with the Neural Net model. Although, it appears that our Neural Net model may suffer from overfitting since the Neural Net has a much better RMSE on the training data set than the MARS model.
 
 ```{r, cache=TRUE}
 list(RMSE_MARS = RMSE(predict(mars.fit.bx, dfTestBX), dfTestY),
@@ -644,12 +644,17 @@ list(RMSE_MARS = RMSE(predict(mars.fit.bx, dfTestBX), dfTestY),
 
 # Model Selection
 
-In order to select our most appropriate model we will use the RSME as our selection criteria. While 
+In order to select our most appropriate model we will use the RSME as our selection criteria.  
 
 ## Final Model
 
 
 # Predictions
+
+```{r}
+#prediction <- predict(rf.fit.bcsx, dfPredBRX)
+#cbind(prediction, dfPredImp)
+```
 
 
 # Appendix A

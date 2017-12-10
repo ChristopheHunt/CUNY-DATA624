@@ -78,6 +78,7 @@ dfBevPred$B <- ifelse(dfBevPred$Brand.Code == "B", 1, 0)
 dfBevPred$C <- ifelse(dfBevPred$Brand.Code == "C", 1, 0)
 dfBevPred$D <- ifelse(dfBevPred$Brand.Code == "D", 1, 0)
 dfBevPred$Brand.Code <- NULL
+library(tidyverse)
 #dfImpMod = missForest(dfBevMod)
 #dfImpMod$OOBerror #error rate looks good?
 #dfModImp <- dfImpMod$ximp
@@ -90,8 +91,8 @@ dfBevPred$Brand.Code <- NULL
 #write.csv(dfPredImp, "PredictImputeData.csv")
 
 #Stored current imputation results on github to quicken knitr iterations
-dfModImp <- read.csv("https://raw.githubusercontent.com/ChristopheHunt/CUNY-DATA624/master/data/TrainImputeData.csv")
-dfPredImp <- read.csv("https://raw.githubusercontent.com/ChristopheHunt/CUNY-DATA624/master/data/PredictImputeData.csv")
+dfModImp <- read.csv("https://raw.githubusercontent.com/ChristopheHunt/CUNY-DATA624/master/data/TrainImputeData.csv") %>% dplyr::select(-X)
+dfPredImp <- read.csv("https://raw.githubusercontent.com/ChristopheHunt/CUNY-DATA624/master/data/PredictImputeData.csv") %>% dplyr::select(-X)
 
 dfModImpX <- dfModImp[,!(names(dfModImp) == "PH")]
 dfModImpY <- dfModImp[, names(dfModImp) == "PH"]
@@ -190,7 +191,7 @@ min_comp
 plot(plsFit, ncomp=30, asp=1, line=TRUE)
 
 pls.pred2 = predict(plsFit, dfPredImp, ncomp=30)
-pls.pred2
+summary(pls.pred2)
 trainControl <- trainControl(method = "cv", number = 10)
 
 #GLM
@@ -252,7 +253,7 @@ rf.fit.x    <- randomForest(dfTrainX,    dfTrainY)
 list(RMSE_RF.BCSX = RMSE(predict(rf.fit.bcsx, dfTestBCSX), dfTestY),
      RMSE_RF.BCS  = RMSE(predict(rf.fit.bx, dfTestBX), dfTestY),
      RMSE_RF.X    = RMSE(predict(rf.fit.x, dfTestX), dfTestY))
-summary(rf.fit.bx, digit=3)
+rf.fit.bcsx
 plot(rf.fit.bx)
 
 library(caret)
@@ -347,5 +348,7 @@ plot(mars.fit.bx)
 varImp(mars.fit.bx)
 list(RMSE_MARS = RMSE(predict(mars.fit.bx, dfTestBX), dfTestY),
      RMSE_NNET = RMSE(predict(nnet.fit.bcsx, dfTestBCSX), dfTestY))
+#prediction <- predict(rf.fit.bcsx, dfPredBRX)
+#cbind(prediction, dfPredImp)
 sessionInfo()
 ## NA
