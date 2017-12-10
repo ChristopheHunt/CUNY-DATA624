@@ -347,6 +347,7 @@ plot(mars.fit.bcsx)
 varImp(mars.fit.bcsx)
 list(RMSE_MARS = RMSE(predict(mars.fit.bcsx, dfTestBCSX), dfTestY),
      RMSE_NNET = RMSE(predict(nnet.fit.bcsx, dfTestBCSX), dfTestY))
+rf.fit.x
 library(tidyverse)
 library(xlsx)
 dfPredImp$PH <- predict(rf.fit.x, dfPredBX)

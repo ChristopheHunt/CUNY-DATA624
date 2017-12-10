@@ -1,9 +1,16 @@
 ---
-title: "Final Draft"
+title: "Project 2 - Group 2"
 output:
   word_document: default
   html_notebook: default
 ---
+
+# Group 2   
+
+Joseph Elikishvili  
+Andrew Goldberg  
+Daniel Hong  
+Christophe Hunt - Group Leader  
 
 ```{r include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning=FALSE, cache=TRUE)
@@ -642,10 +649,19 @@ list(RMSE_MARS = RMSE(predict(mars.fit.bcsx, dfTestBCSX), dfTestY),
 
 # Model Selection
 
-In order to select our most appropriate model we will use the RSME as our selection criteria.  
+Conclusion
+
+Often the goal of model selection is to choose the best fit for future prediction after exhaustively running iterations of various methods. Selecting the best fit is typically done by measuring the accuracy of predictions with a squared error loss. Assessing the fit of regression models can be challenging but different methodologies can be employed to accomplish this goal.
+
+We decided to focus on the Root Mean Squared Error (RMSE) or the square root of the variance of the residuals. The RMSE determines the absolute fit of the model to the data, which measures the closeness of the observed data points to the model's predicted values. Lower RMSE values are better indicators of fit and is widely regarded as  the most important measure of accuracy when performing predictions.
+
+Several of the models we ran had RMSE values that were pretty close, however we concluded that there was incremental improvement with Random Forest because it met this criterion, lowest RMSE.
 
 ## Final Model
 
+```{r}
+rf.fit.x
+```
 
 # Predictions
 
